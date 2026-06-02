@@ -802,7 +802,7 @@ function openModal(day, proc, slot, id) {
   document.getElementById('btn-dup').style.display = id ? 'block' : 'none';
   document.getElementById('btn-print').style.display = id ? 'block' : 'none';
 
-  const isScheduled = id && jobs[id] ? !jobs[id].unscheduled : (day !== null);
+  const isScheduled = id && jobs[id] ? !jobs[id].unscheduled : false;
   document.getElementById('f-schedule-toggle').checked = isScheduled;
   document.getElementById('schedule-fields').classList.toggle('visible', isScheduled);
 
