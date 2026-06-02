@@ -329,7 +329,7 @@
     <div class="field"><label>Customer name *</label><input type="text" id="f-customer" placeholder="e.g. Apex Welding"></div>
     <div class="field"><label>Phone number <span style="font-weight:400;color:var(--text3);">(optional)</span></label><input type="tel" id="f-phone" placeholder="e.g. 770-555-1234"></div>
     <div class="field"><label>Item description</label><textarea id="f-desc" placeholder="e.g. 4 trailer frames, remove old powder"></textarea></div>
-    <div class="field"><label>Color / finish</label><input type="text" id="f-color" placeholder="e.g. Matte Black"></div>
+    <div class="field"><label>Color / finish</label><input type="text" id="f-color" placeholder="e.g. Matte Black" list="color-datalist" autocomplete="off"><datalist id="color-datalist"></datalist></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
       <div class="field"><label>Minimum Cure Temp <span style="font-weight:400;color:var(--text3);">(°F)</span></label><input type="text" id="f-cure-temp" placeholder="e.g. 350"></div>
       <div class="field"><label>Minimum Cure Time <span style="font-weight:400;color:var(--text3);">(min)</span></label><input type="text" id="f-cure-time" placeholder="e.g. 15"></div>
@@ -432,6 +432,21 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script>
+// ===== POWDER CURE LIBRARY =====
+// Each color maps to its cure schedule: three temp/time pairs (degrees F / minutes), at peak metal temp.
+// To add a color, copy a line and change the name and numbers. To remove one, delete its line.
+const COLORS = {
+  "Matte Black (IFS)":         { cureTemp: 320, cureTime: 24, cureTemp2: 350, cureTime2: 17, cureTemp3: 375, cureTime3: 13 },
+  "Satin Black (IFS)":         { cureTemp: 320, cureTime: 24, cureTemp2: 350, cureTime2: 17, cureTemp3: 375, cureTime3: 13 },
+  "Lithonia Bronze (IFS)":     { cureTemp: 300, cureTime: 20, cureTemp2: 340, cureTime2: 10, cureTemp3: 375, cureTime3: 7  },
+  "Vulcan Black (Vitracoat)":  { cureTemp: 350, cureTime: 25, cureTemp2: 375, cureTime2: 17, cureTemp3: 400, cureTime3: 10 },
+  "RAL 9003 (Vitracoat)":      { cureTemp: 330, cureTime: 35, cureTemp2: 350, cureTime2: 20, cureTemp3: 375, cureTime3: 10 },
+  "RAL 9006 (Vitracoat)":      { cureTemp: 330, cureTime: 35, cureTemp2: 350, cureTime2: 20, cureTemp3: 375, cureTime3: 10 },
+  "RAL 7035 (Vitracoat)":      { cureTemp: 330, cureTime: 35, cureTemp2: 350, cureTime2: 20, cureTemp3: 375, cureTime3: 10 },
+  "RAL 7043 (Vitracoat)":      { cureTemp: 330, cureTime: 35, cureTemp2: 350, cureTime2: 20, cureTemp3: 375, cureTime3: 10 },
+  "Safety Yellow (Vitracoat)": { cureTemp: 330, cureTime: 35, cureTemp2: 350, cureTime2: 20, cureTemp3: 375, cureTime3: 10 },
+};
+
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
 const DAYS_SHORT = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 const PROCESSES = ['blast','prep','coat'];
@@ -858,6 +873,26 @@ function openModal(day, proc, slot, id) {
 
 function closeModal() { document.getElementById('modal-overlay').classList.remove('open'); }
 function overlayClick(e) { if(e.target===document.getElementById('modal-overlay'))closeModal(); }
+
+// Populate datalist from COLORS library and wire up autofill on user input.
+(function() {
+  const dl = document.getElementById('color-datalist');
+  Object.keys(COLORS).forEach(function(name) {
+    const opt = document.createElement('option');
+    opt.value = name;
+    dl.appendChild(opt);
+  });
+  document.getElementById('f-color').addEventListener('input', function() {
+    const sched = COLORS[this.value];
+    if (!sched) return;
+    document.getElementById('f-cure-temp').value   = sched.cureTemp;
+    document.getElementById('f-cure-time').value   = sched.cureTime;
+    document.getElementById('f-cure-temp-2').value = sched.cureTemp2;
+    document.getElementById('f-cure-time-2').value = sched.cureTime2;
+    document.getElementById('f-cure-temp-3').value = sched.cureTemp3;
+    document.getElementById('f-cure-time-3').value = sched.cureTime3;
+  });
+})();
 
 function saveJob() {
   const customer = document.getElementById('f-customer').value.trim();
