@@ -116,6 +116,7 @@
   .card-desc { font-size: 10px; color: var(--text2); margin-top: 2px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.3; }
   .card-color { font-size: 10px; color: var(--text3); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .card-pickup { font-size: 10px; color: var(--teal-dark); margin-top: 2px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .card-arrival { font-size: 10px; color: #8E5A00; margin-top: 2px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .card-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 4px; gap: 4px; flex-wrap: wrap; }
   .status-btn { display: inline-block; font-size: 9px; padding: 2px 6px; border-radius: 20px; border: none; cursor: pointer; font-weight: 600; flex-shrink: 0; }
   .status-btn.not-started { background: var(--status-ns-bg); color: var(--status-ns-text); }
@@ -382,6 +383,12 @@
       <div id="eta-field" style="display:none; margin-top:4px;">
         <div class="field" style="margin-bottom:0;"><label>Expected ETA</label><input type="date" id="f-powder-eta"></div>
       </div>
+    </div>
+
+    <div class="section-divider">Expected Arrival</div>
+    <div class="field" style="margin-bottom:0;">
+      <label>Expected arrival date</label>
+      <input type="date" id="f-expected-arrival">
     </div>
 
     <div class="section-divider">Pickup</div>
@@ -705,6 +712,12 @@ function makeCard(id, job, isParking) {
     pu.textContent = '🕐 ' + fmtPickup(job.pickup);
     card.appendChild(pu);
   }
+  if (job.expectedArrival) {
+    const ar = document.createElement('div');
+    ar.className = 'card-arrival';
+    ar.textContent = '📦 Arriving ' + fmtArrival(job.expectedArrival);
+    card.appendChild(ar);
+  }
   if (job.photos && job.photos.length > 0) {
     const ph = document.createElement('div');
     ph.className = 'card-has-photo';
@@ -838,6 +851,7 @@ function openModal(day, proc, slot, id) {
     selectProcess(j.process||'coat');
     populateStatusDropdown(j.process||'coat', j.status||getDefaultStatus(j.process||'coat'));
     updateSlotOptions(j.day||0, j.process||'coat', j.slot||0);
+    document.getElementById('f-expected-arrival').value = j.expectedArrival||'';
     document.getElementById('f-pickup').value = j.pickup||'';
     loadPhotoPreview(j.photos||[]);
   } else {
@@ -864,6 +878,7 @@ function openModal(day, proc, slot, id) {
     selectProcess(proc||'coat');
     populateStatusDropdown(proc||'coat', getDefaultStatus(proc||'coat'));
     updateSlotOptions(day!==null?day:0, proc||'coat', slot!==null?slot:0);
+    document.getElementById('f-expected-arrival').value = '';
     document.getElementById('f-pickup').value = '';
     loadPhotoPreview([]);
   }
@@ -923,6 +938,7 @@ function saveJob() {
     unscheduled: !scheduled,
     powderStatus: (document.querySelector('input[name=powder]:checked') || {}).value || '',
     powderEta: document.getElementById('f-powder-ordered').checked ? document.getElementById('f-powder-eta').value : '',
+    expectedArrival: document.getElementById('f-expected-arrival').value || '',
     pickup: document.getElementById('f-pickup').value || '',
     photos: currentPhotos.slice()
   };
@@ -1096,6 +1112,12 @@ function fmtPickup(val) {
   if (!val) return '';
   const d = new Date(val);
   return d.toLocaleDateString('en-US',{month:'short',day:'numeric'}) + ' ' + d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+}
+
+function fmtArrival(val) {
+  if (!val) return '';
+  const [y, m, d] = val.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('en-US', {month:'short', day:'numeric'});
 }
 
 function loadPhotoPreview(photos) {
