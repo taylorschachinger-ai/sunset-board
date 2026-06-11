@@ -209,12 +209,27 @@
   .setup p { color: var(--text2); font-size: 13px; line-height: 1.6; margin-bottom: 16px; }
   .setup .step { background: var(--bg); border-radius: var(--radius-sm); padding: 14px; margin-bottom: 10px; }
   .setup .step h3 { font-size: 13px; font-weight: 700; margin-bottom: 5px; }
-  .setup input[type=text] { width: 100%; padding: 9px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 13px; font-family: inherit; margin-bottom: 8px; }
+  .setup input[type=text], .setup input[type=email], .setup input[type=password] { width: 100%; padding: 9px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 13px; font-family: inherit; margin-bottom: 8px; }
   .setup .btn-connect { width: 100%; padding: 11px; background: var(--teal); color: #fff; border: none; border-radius: var(--radius-sm); font-size: 14px; font-weight: 600; cursor: pointer; }
   .setup .note { font-size: 11px; color: var(--text3); margin-top: 12px; }
+  .si-error { color: #A32D2D; font-size: 13px; margin-bottom: 8px; display: none; }
+  .signout-btn { padding: 5px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); font-size: 12px; cursor: pointer; color: var(--text2); }
 </style>
 </head>
 <body>
+
+<div id="signin-screen" style="display:none; padding: 16px;">
+  <div class="setup">
+    <h1>Sign in</h1>
+    <p>Enter your Sunset Board credentials to continue.</p>
+    <div class="step">
+      <input type="email" id="si-email" placeholder="Email" autocomplete="email">
+      <input type="password" id="si-password" placeholder="Password" autocomplete="current-password" onkeydown="if(event.key==='Enter')signIn()">
+      <div class="si-error" id="si-error"></div>
+      <button class="btn-connect" onclick="signIn()">Sign in</button>
+    </div>
+  </div>
+</div>
 
 <div id="setup-screen" style="display:none; padding: 16px;">
   <div class="setup">
@@ -250,6 +265,7 @@
     </div>
     <div class="header-right">
       <div class="sync-dot" id="sync-dot"></div>
+      <button class="signout-btn" onclick="signOut()">Sign out</button>
       <button class="add-btn" onclick="openModal()">+ Add job</button>
     </div>
   </div>
@@ -438,6 +454,7 @@
 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script>
 // ===== POWDER CURE LIBRARY =====
 // Each color maps to its cure schedule: three temp/time pairs (degrees F / minutes), at peak metal temp.
@@ -490,7 +507,36 @@ function saveConfig() {
   const cfg = { apiKey: document.getElementById('cfg-apiKey').value.trim(), authDomain: document.getElementById('cfg-authDomain').value.trim(), databaseURL: document.getElementById('cfg-dbUrl').value.trim(), projectId: document.getElementById('cfg-projectId').value.trim() };
   if (!cfg.apiKey || !cfg.databaseURL) { alert('apiKey and databaseURL are required.'); return; }
   localStorage.setItem('sunset_fb_config', JSON.stringify(cfg));
-  initApp(cfg);
+  startAuth(cfg);
+}
+
+function startAuth(cfg) {
+  if (!firebase.apps.length) firebase.initializeApp(cfg);
+  firebase.auth().onAuthStateChanged(function(user) {
+    if (user) {
+      document.getElementById('signin-screen').style.display = 'none';
+      if (document.getElementById('app').style.display === 'none') initApp(cfg);
+    } else {
+      document.getElementById('setup-screen').style.display = 'none';
+      document.getElementById('app').style.display = 'none';
+      document.getElementById('signin-screen').style.display = 'block';
+    }
+  });
+}
+
+function signIn() {
+  const email = document.getElementById('si-email').value.trim();
+  const password = document.getElementById('si-password').value;
+  const errEl = document.getElementById('si-error');
+  errEl.style.display = 'none';
+  firebase.auth().signInWithEmailAndPassword(email, password).catch(function(err) {
+    errEl.textContent = err.message;
+    errEl.style.display = 'block';
+  });
+}
+
+function signOut() {
+  firebase.auth().signOut().then(function() { location.reload(); });
 }
 
 function initApp(cfg) {
@@ -1234,7 +1280,7 @@ function startTouchDrag(e, id, card) {
 
 window.addEventListener('load', () => {
   const cfg = getConfig();
-  if (cfg&&cfg.apiKey&&cfg.databaseURL) initApp(cfg);
+  if (cfg&&cfg.apiKey&&cfg.databaseURL) startAuth(cfg);
   else document.getElementById('setup-screen').style.display='block';
   parkingOpen = false; toggleParking();
   pickupOpen = false; togglePickup();
