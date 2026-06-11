@@ -29,6 +29,7 @@
   @keyframes spin { to { transform: rotate(360deg); } }
   .cfg-input { width: 100%; padding: 9px 10px; border: 1px solid #e0e0dc; border-radius: 6px; font-size: 13px; font-family: inherit; margin-bottom: 8px; }
   .cfg-btn { width: 100%; padding: 12px; background: #1D9E75; color: #fff; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; }
+  .si-error { color: #A32D2D; font-size: 13px; margin-bottom: 8px; display: none; text-align: left; }
 </style>
 </head>
 <body>
@@ -36,7 +37,7 @@
   <div class="logo">Sunset <span>Board</span></div>
   <div class="subtitle">Job Status Update</div>
 
-  <div id="loading" style="color:#888;font-size:14px;padding:20px 0;">Loading job...</div>
+  <div id="loading" style="color:#888;font-size:14px;padding:20px 0;">Loading...</div>
   <div id="content" style="display:none;">
     <div class="job-info" id="job-info"></div>
     <div class="field">
@@ -52,6 +53,7 @@
 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script>
 const STATUSES_BY_PROCESS = {
   blast: ['not-started','in-progress','done'],
@@ -94,7 +96,14 @@ function init() {
     showConfigForm();
     return;
   }
-  connectAndLoad(cfg);
+  if (!firebase.apps.length) firebase.initializeApp(cfg);
+  firebase.auth().onAuthStateChanged(function(user) {
+    if (user) {
+      connectAndLoad();
+    } else {
+      showSignInForm(cfg);
+    }
+  });
 }
 
 function showConfigForm() {
@@ -117,12 +126,43 @@ function saveConfig() {
   if (!cfg.apiKey || !cfg.databaseURL) { alert('apiKey and databaseURL are required.'); return; }
   localStorage.setItem('sunset_fb_config', JSON.stringify(cfg));
   document.getElementById('loading').textContent = 'Connecting...';
-  connectAndLoad(cfg);
+  if (!firebase.apps.length) firebase.initializeApp(cfg);
+  firebase.auth().onAuthStateChanged(function(user) {
+    if (user) {
+      connectAndLoad();
+    } else {
+      showSignInForm(cfg);
+    }
+  });
 }
 
-function connectAndLoad(cfg) {
-  if (!firebase.apps.length) firebase.initializeApp(cfg);
+function showSignInForm() {
+  document.getElementById('loading').innerHTML = `
+    <p style="margin-bottom:12px;font-size:13px;color:#888;">Sign in to continue.</p>
+    <input type="email" class="cfg-input" id="si-email" placeholder="Email" autocomplete="email">
+    <input type="password" class="cfg-input" id="si-password" placeholder="Password" autocomplete="current-password">
+    <div class="si-error" id="si-error"></div>
+    <button class="cfg-btn" onclick="signIn()">Sign in</button>`;
+  document.getElementById('si-password').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') signIn();
+  });
+}
+
+function signIn() {
+  const email = document.getElementById('si-email').value.trim();
+  const password = document.getElementById('si-password').value;
+  const errEl = document.getElementById('si-error');
+  errEl.style.display = 'none';
+  firebase.auth().signInWithEmailAndPassword(email, password).catch(function(err) {
+    errEl.textContent = err.message;
+    errEl.style.display = 'block';
+  });
+  // onAuthStateChanged fires on success and calls connectAndLoad
+}
+
+function connectAndLoad() {
   db = firebase.database();
+  document.getElementById('loading').textContent = 'Loading job...';
   db.ref('jobs/' + jobId).once('value', snap => {
     jobData = snap.val();
     if (!jobData) { showError('Job not found. It may have been deleted.'); return; }
