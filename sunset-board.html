@@ -1008,6 +1008,33 @@ function duplicateJob() {
   if (!parkingOpen) toggleParking();
 }
 
+function buildWorkBanner(j) {
+  const WORK_TYPES = {
+    blast: {
+      label: 'BLAST',
+      cls: 'work-blast',
+      icon: '<svg width="36" height="36" viewBox="0 0 36 36" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><polygon points="18,2 21.5,14.5 33,9 24.5,19 33,29 21.5,23.5 18,34 14.5,23.5 3,29 11.5,19 3,9 14.5,14.5"/></svg>'
+    },
+    prep: {
+      label: 'PREP',
+      cls: 'work-prep',
+      icon: '<svg width="36" height="36" viewBox="0 0 36 36" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M30 4c-.4 0-.8.1-1.2.2l3.5 3.5-4.2 4.2-5-5 3.3-3.5A8 8 0 0 0 14 13c0 1 .2 2 .5 3L4 26a3 3 0 1 0 4.2 4.2l10.5-10.5c1 .3 2 .5 3 .5a8 8 0 0 0 8-10.2z"/></svg>'
+    },
+    coat: {
+      label: 'COAT',
+      cls: 'work-coat',
+      icon: '<svg width="28" height="36" viewBox="0 0 28 36" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M14 0C14 0 0 16 0 23a14 14 0 0 0 28 0C28 16 14 0 14 0z"/></svg>'
+    }
+  };
+  const types = [j.process].filter(t => WORK_TYPES[t]);
+  if (!types.length) return '';
+  const badges = types.map(t => {
+    const wt = WORK_TYPES[t];
+    return `<div class="work-badge ${wt.cls}">${wt.icon}<div class="work-badge-label">${wt.label}</div></div>`;
+  }).join('');
+  return `<div class="work-banner">${badges}</div>`;
+}
+
 function printJobTicket() {
   if (!editingId || !jobs[editingId]) return;
   const j = jobs[editingId];
@@ -1061,6 +1088,12 @@ function printJobTicket() {
   .photo { width: 160px; height: 120px; object-fit: cover; border-radius: 6px; border: 1px solid #e0e0dc; }
   .footer { margin-top: 24px; padding-top: 12px; border-top: 1px solid #e0e0dc; display: flex; justify-content: space-between; font-size: 11px; color: #aaa; }
   .divider { border: none; border-top: 1px solid #e0e0dc; margin: 14px 0; }
+  .work-banner { display: flex; gap: 16px; margin-bottom: 20px; }
+  .work-badge { display: flex; flex-direction: row; align-items: center; gap: 12px; padding: 14px 22px; border-radius: 8px; border: 3px solid; }
+  .work-badge-label { font-size: 28px; font-weight: 900; letter-spacing: 0.12em; }
+  .work-blast { background: #FDF0D5; color: #7A3B00; border-color: #C97A00; }
+  .work-prep  { background: #E0EEFA; color: #0C3D70; border-color: #2E6BAD; }
+  .work-coat  { background: #DFF2E8; color: #1B5E2F; border-color: #2E8B4E; }
   @media print {
     body { padding: 16px; }
     .no-print { display: none; }
@@ -1068,6 +1101,7 @@ function printJobTicket() {
 </style>
 </head>
 <body>
+${buildWorkBanner(j)}
 <div class="header">
   <div class="header-left">
     <h1>Job Ticket</h1>
