@@ -267,6 +267,7 @@
     </div>
     <div class="header-right">
       <div class="sync-dot" id="sync-dot"></div>
+      <span id="role-indicator" style="font-size:11px;color:var(--text3);white-space:nowrap;"></span>
       <button class="signout-btn" onclick="signOut()">Sign out</button>
       <button class="add-btn" onclick="openModal()">+ Add job</button>
     </div>
@@ -449,7 +450,7 @@
       <button class="btn-dup" id="btn-dup" onclick="duplicateJob()" style="display:none;">Duplicate</button>
       <button class="btn-print" id="btn-print" onclick="printJobTicket()" style="display:none;">🖨 Print</button>
       <button class="btn-cancel" onclick="closeModal()">Cancel</button>
-      <button class="btn-save" onclick="saveJob()">Save</button>
+      <button class="btn-save" id="btn-save" onclick="saveJob()">Save</button>
     </div>
   </div>
 </div>
@@ -521,6 +522,8 @@ function startAuth(cfg) {
       if (document.getElementById('app').style.display === 'none') {
         firebase.database().ref('roles/' + user.uid).once('value', function(snap) {
           userRole = snap.val() === 'admin' ? 'admin' : 'staff';
+          var ri = document.getElementById('role-indicator');
+          if (ri) ri.textContent = (user.email || '') + ' — ' + userRole;
           initApp(cfg);
         });
       }
