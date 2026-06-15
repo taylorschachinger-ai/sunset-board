@@ -77,9 +77,12 @@ const jobId = params.get('job');
 let db = null;
 let jobData = null;
 
-function getConfig() {
-  try { return JSON.parse(localStorage.getItem('sunset_fb_config') || 'null'); } catch(e) { return null; }
-}
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyDzT6-qon4IDJM_ALWbbBxy532hSQSTJvs",
+  authDomain: "sunset-schedule.firebaseapp.com",
+  databaseURL: "https://sunset-schedule-default-rtdb.firebaseio.com",
+  projectId: "sunset-schedule"
+};
 
 function showError(msg) {
   document.getElementById('loading').style.display = 'none';
@@ -91,47 +94,12 @@ function showError(msg) {
 
 function init() {
   if (!jobId) { showError('Invalid QR code — no job ID found.'); return; }
-  const cfg = getConfig();
-  if (!cfg || !cfg.apiKey || !cfg.databaseURL) {
-    showConfigForm();
-    return;
-  }
-  if (!firebase.apps.length) firebase.initializeApp(cfg);
+  if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
   firebase.auth().onAuthStateChanged(function(user) {
     if (user) {
       connectAndLoad();
     } else {
-      showSignInForm(cfg);
-    }
-  });
-}
-
-function showConfigForm() {
-  document.getElementById('loading').innerHTML = `
-    <p style="margin-bottom:16px;font-size:13px;color:#888;">Enter your Firebase config to connect (saved for next time):</p>
-    <input type="text" class="cfg-input" id="cfg-apiKey" placeholder="apiKey">
-    <input type="text" class="cfg-input" id="cfg-authDomain" placeholder="authDomain">
-    <input type="text" class="cfg-input" id="cfg-dbUrl" placeholder="databaseURL">
-    <input type="text" class="cfg-input" id="cfg-projectId" placeholder="projectId">
-    <button class="cfg-btn" onclick="saveConfig()">Connect</button>`;
-}
-
-function saveConfig() {
-  const cfg = {
-    apiKey: document.getElementById('cfg-apiKey').value.trim(),
-    authDomain: document.getElementById('cfg-authDomain').value.trim(),
-    databaseURL: document.getElementById('cfg-dbUrl').value.trim(),
-    projectId: document.getElementById('cfg-projectId').value.trim()
-  };
-  if (!cfg.apiKey || !cfg.databaseURL) { alert('apiKey and databaseURL are required.'); return; }
-  localStorage.setItem('sunset_fb_config', JSON.stringify(cfg));
-  document.getElementById('loading').textContent = 'Connecting...';
-  if (!firebase.apps.length) firebase.initializeApp(cfg);
-  firebase.auth().onAuthStateChanged(function(user) {
-    if (user) {
-      connectAndLoad();
-    } else {
-      showSignInForm(cfg);
+      showSignInForm();
     }
   });
 }

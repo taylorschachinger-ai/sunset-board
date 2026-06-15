@@ -233,21 +233,6 @@
   </div>
 </div>
 
-<div id="setup-screen" style="display:none; padding: 16px;">
-  <div class="setup">
-    <h1>Connect Firebase</h1>
-    <p>Enter your Firebase config to sync in real time across all devices.</p>
-    <div class="step">
-      <h3>Enter your config</h3>
-      <input type="text" id="cfg-apiKey" placeholder="apiKey">
-      <input type="text" id="cfg-authDomain" placeholder="authDomain">
-      <input type="text" id="cfg-dbUrl" placeholder="databaseURL">
-      <input type="text" id="cfg-projectId" placeholder="projectId">
-      <button class="btn-connect" onclick="saveConfig()">Connect &amp; open board</button>
-    </div>
-    <p class="note">Config saves in this browser. Enter once per device.</p>
-  </div>
-</div>
 
 <div id="app" style="display:none;">
   <div class="header">
@@ -505,14 +490,12 @@ let parkingOpen = true;
 let pickupOpen = true;
 let userRole = 'staff'; // 'admin' or 'staff'; default safe until role is loaded
 
-function getConfig() { try { return JSON.parse(localStorage.getItem('sunset_fb_config') || 'null'); } catch(e) { return null; } }
-
-function saveConfig() {
-  const cfg = { apiKey: document.getElementById('cfg-apiKey').value.trim(), authDomain: document.getElementById('cfg-authDomain').value.trim(), databaseURL: document.getElementById('cfg-dbUrl').value.trim(), projectId: document.getElementById('cfg-projectId').value.trim() };
-  if (!cfg.apiKey || !cfg.databaseURL) { alert('apiKey and databaseURL are required.'); return; }
-  localStorage.setItem('sunset_fb_config', JSON.stringify(cfg));
-  startAuth(cfg);
-}
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyDzT6-qon4IDJM_ALWbbBxy532hSQSTJvs",
+  authDomain: "sunset-schedule.firebaseapp.com",
+  databaseURL: "https://sunset-schedule-default-rtdb.firebaseio.com",
+  projectId: "sunset-schedule"
+};
 
 function startAuth(cfg) {
   if (!firebase.apps.length) firebase.initializeApp(cfg);
@@ -524,11 +507,10 @@ function startAuth(cfg) {
           userRole = snap.val() === 'admin' ? 'admin' : 'staff';
           var ri = document.getElementById('role-indicator');
           if (ri) ri.textContent = (user.email || '') + ' — ' + userRole;
-          initApp(cfg);
+          initApp();
         });
       }
     } else {
-      document.getElementById('setup-screen').style.display = 'none';
       document.getElementById('app').style.display = 'none';
       document.getElementById('signin-screen').style.display = 'block';
     }
@@ -550,10 +532,8 @@ function signOut() {
   firebase.auth().signOut().then(function() { location.reload(); });
 }
 
-function initApp(cfg) {
-  document.getElementById('setup-screen').style.display = 'none';
+function initApp() {
   document.getElementById('app').style.display = 'block';
-  if (!firebase.apps.length) firebase.initializeApp(cfg);
   db = firebase.database();
   db.ref('.info/connected').on('value', snap => { document.getElementById('sync-dot').className = 'sync-dot ' + (snap.val() ? 'live' : 'error'); });
   db.ref('jobs').on('value', snap => { jobs = snap.val() || {}; render(); renderParking(); renderPickup(); });
@@ -1384,9 +1364,7 @@ function startTouchDrag(e, id, card) {
 }
 
 window.addEventListener('load', () => {
-  const cfg = getConfig();
-  if (cfg&&cfg.apiKey&&cfg.databaseURL) startAuth(cfg);
-  else document.getElementById('setup-screen').style.display='block';
+  startAuth(FIREBASE_CONFIG);
   parkingOpen = false; toggleParking();
   pickupOpen = false; togglePickup();
 });
