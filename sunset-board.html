@@ -502,6 +502,7 @@ let db = null, weekOffset = 0, currentView = 5, currentDayOffset = 0;
 let jobs = {}, slotCounts = {}, editingId = null, selectedProcess = 'coat', dragId = null;
 let parkingOpen = true;
 let pickupOpen = true;
+let userRole = 'staff'; // 'admin' or 'staff'; default safe until role is loaded
 
 function getConfig() { try { return JSON.parse(localStorage.getItem('sunset_fb_config') || 'null'); } catch(e) { return null; } }
 
@@ -517,7 +518,12 @@ function startAuth(cfg) {
   firebase.auth().onAuthStateChanged(function(user) {
     if (user) {
       document.getElementById('signin-screen').style.display = 'none';
-      if (document.getElementById('app').style.display === 'none') initApp(cfg);
+      if (document.getElementById('app').style.display === 'none') {
+        firebase.database().ref('roles/' + user.uid).once('value', function(snap) {
+          userRole = snap.val() === 'admin' ? 'admin' : 'staff';
+          initApp(cfg);
+        });
+      }
     } else {
       document.getElementById('setup-screen').style.display = 'none';
       document.getElementById('app').style.display = 'none';
@@ -555,6 +561,7 @@ function initApp(cfg) {
   if (window.innerWidth < 500) setView(1);
   else if (window.innerWidth < 850) setView(3);
   else setView(5);
+  document.body.setAttribute('data-role', userRole);
 }
 
 function getMondayOf(offset) {
@@ -796,14 +803,17 @@ function makeCard(id, job, isParking) {
     openModal(null, null, null, id);
   });
 
-  // Mouse drag (desktop)
-  card.draggable = true;
-  card.addEventListener('dragstart', (e) => { dragId = id; setTimeout(()=>card.classList.add('dragging'),0); });
-  card.addEventListener('dragend', () => { dragId = null; card.classList.remove('dragging'); });
+  // Mouse drag (desktop) — admin only; staff cannot reschedule
+  card.draggable = userRole === 'admin';
+  if (userRole === 'admin') {
+    card.addEventListener('dragstart', (e) => { dragId = id; setTimeout(()=>card.classList.add('dragging'),0); });
+    card.addEventListener('dragend', () => { dragId = null; card.classList.remove('dragging'); });
+  }
 
-  // Touch drag (mobile/tablet)
+  // Touch drag (mobile/tablet) — admin only
   card.addEventListener('touchstart', (e) => {
     didDrag = false;
+    if (userRole !== 'admin') return;
     pressTimer = setTimeout(() => {
       didDrag = true;
       startTouchDrag(e, id, card);
@@ -930,6 +940,29 @@ function openModal(day, proc, slot, id) {
     document.getElementById('f-pickup').value = '';
     loadPhotoPreview([]);
   }
+
+  // Role gating: staff editing an EXISTING job → read-only except status
+  const isExistingJob = !!(id && jobs[id]);
+  const staffReadOnly = userRole === 'staff' && isExistingJob;
+  const editableIds = ['f-customer','f-phone','f-desc','f-color','f-cure-temp','f-cure-time',
+    'f-cure-temp-2','f-cure-time-2','f-cure-temp-3','f-cure-time-3','f-invoice','f-rack',
+    'f-masking','f-masking-desc','f-powder-eta','f-expected-arrival','f-pickup',
+    'f-schedule-toggle','f-day','f-slot'];
+  editableIds.forEach(function(fid) {
+    const el = document.getElementById(fid);
+    if (el) el.disabled = staffReadOnly;
+  });
+  document.querySelectorAll('input[name=powder]').forEach(function(r) { r.disabled = staffReadOnly; });
+  document.querySelectorAll('.process-opt').forEach(function(el) {
+    el.style.pointerEvents = staffReadOnly ? 'none' : '';
+    el.style.opacity = staffReadOnly ? '0.5' : '';
+  });
+  if (staffReadOnly) {
+    document.getElementById('btn-del').style.display = 'none';
+    document.getElementById('btn-dup').style.display = 'none';
+  }
+  document.getElementById('btn-save').style.display = staffReadOnly ? 'none' : '';
+  document.getElementById('btn-save').textContent = isExistingJob ? 'Save' : 'Add job';
 
   document.getElementById('f-day').onchange = function() { updateSlotOptions(this.value, selectedProcess, 0); };
   document.getElementById('modal-overlay').classList.add('open');
