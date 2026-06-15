@@ -834,7 +834,7 @@ function makeCard(id, job, isParking) {
   return card;
 }
 
-function cycleStatus(id, job) { const statuses=getStatuses(job.process); const i=statuses.indexOf(job.status||statuses[0]); db.ref('jobs/'+id).update({status:statuses[(i+1)%statuses.length]}); }
+function cycleStatus(id, job) { const statuses=getStatuses(job.process); const i=statuses.indexOf(job.status||statuses[0]); db.ref('jobs/'+id+'/status').set(statuses[(i+1)%statuses.length]); }
 function populateStatusDropdown(process, currentStatus) {
   const sel = document.getElementById('f-status');
   const statuses = getStatuses(process);

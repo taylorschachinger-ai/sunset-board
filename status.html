@@ -199,7 +199,7 @@ function confirmUpdate() {
   spinner.style.display = 'block';
   result.textContent = '';
 
-  db.ref('jobs/' + jobId).update({ status: newStatus }, err => {
+  db.ref('jobs/' + jobId + '/status').set(newStatus, err => {
     spinner.style.display = 'none';
     if (err) {
       result.className = 'result error';
