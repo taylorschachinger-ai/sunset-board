@@ -1105,7 +1105,13 @@ function buildTicketStyles() {
 function buildTicketBodyHtml(jobId, j) {
   const processLabel = (j.process || '').charAt(0).toUpperCase() + (j.process || '').slice(1);
   const pickupStr = j.pickup ? fmtPickup(j.pickup) : '';
-  const dateStr = new Date().toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'});
+  const printedStr = new Date().toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'});
+  let scheduledDateStr = '';
+  if (!j.unscheduled && j.week) {
+    const mon = new Date(j.week + 'T12:00:00');
+    mon.setDate(mon.getDate() + (j.day || 0));
+    scheduledDateStr = mon.toLocaleDateString('en-US', {weekday:'short', month:'short', day:'numeric', year:'numeric'});
+  }
   let photosHtml = '';
   if (j.photos && j.photos.length > 0) {
     photosHtml = '<div class="section-title">Photos</div><div class="photos">' +
@@ -1117,7 +1123,7 @@ function buildTicketBodyHtml(jobId, j) {
   <div class="header-left">
     <h1>Job Ticket</h1>
     <div class="subtitle">Sunset Powder Coating &amp; Sandblasting</div>
-    <div style="font-size:12px;color:#888;margin-top:4px;">Date: <strong style="color:#1a1a18;">${dateStr}</strong></div>
+    <div style="font-size:12px;color:#888;margin-top:4px;">Date: <strong style="color:#1a1a18;">${scheduledDateStr || 'Unscheduled'}</strong></div>
   </div>
   <img src="${PRINT_LOGO_B64}" class="logo" alt="Sunset Logo">
 </div>
@@ -1179,7 +1185,7 @@ ${photosHtml}
 </div>
 
 <div class="footer">
-  <span>Printed: ${dateStr}</span>
+  <span>Printed: ${printedStr}</span>
   <span>Sunset Powder Coating &amp; Sandblasting — Winder, GA</span>
 </div>`;
 }
