@@ -1009,6 +1009,7 @@ function duplicateJob() {
 }
 
 function buildOvenCheck(j) {
+  if (j.process !== 'coat') return '';
   const pairs = [
     [j.cureTemp, j.cureTime],
     [j.cureTemp2, j.cureTime2],
