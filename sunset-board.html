@@ -1046,7 +1046,7 @@ function buildOvenCheck(j) {
 </div>`;
 }
 
-function buildWorkBanner(j) {
+function buildWorkBanner(j, posNum) {
   const WORK_TYPES = {
     blast: {
       label: 'BLAST',
@@ -1068,7 +1068,8 @@ function buildWorkBanner(j) {
   if (!types.length) return '';
   const badges = types.map(t => {
     const wt = WORK_TYPES[t];
-    return `<div class="work-badge ${wt.cls}">${wt.icon}<div class="work-badge-label">${wt.label}</div></div>`;
+    const numBadge = posNum ? `<div class="work-pos-badge">${posNum}</div>` : '';
+    return `<div class="work-badge ${wt.cls}">${wt.icon}<div class="work-badge-label">${wt.label}</div>${numBadge}</div>`;
   }).join('');
   return `<div class="work-banner">${badges}</div>`;
 }
@@ -1111,6 +1112,7 @@ function buildTicketStyles() {
   .work-banner { display: flex; gap: 16px; margin-bottom: 20px; }
   .work-badge { display: flex; flex-direction: row; align-items: center; gap: 12px; padding: 14px 22px; border-radius: 8px; border: 3px solid; }
   .work-badge-label { font-size: 28px; font-weight: 900; letter-spacing: 0.12em; }
+  .work-pos-badge { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 50%; border: 2.5px solid currentColor; font-size: 20px; font-weight: 900; margin-left: 4px; flex-shrink: 0; }
   .work-blast { background: #FDF0D5; color: #7A3B00; border-color: #C97A00; }
   .work-prep  { background: #E0EEFA; color: #0C3D70; border-color: #2E6BAD; }
   .work-coat  { background: #DFF2E8; color: #1B5E2F; border-color: #2E8B4E; }
@@ -1121,7 +1123,7 @@ function buildTicketStyles() {
   .page-break { page-break-after: always; }`;
 }
 
-function buildTicketBodyHtml(jobId, j) {
+function buildTicketBodyHtml(jobId, j, posNum) {
   const processLabel = (j.process || '').charAt(0).toUpperCase() + (j.process || '').slice(1);
   const pickupStr = j.pickup ? fmtPickup(j.pickup) : '';
   const printedStr = new Date().toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'});
@@ -1137,7 +1139,7 @@ function buildTicketBodyHtml(jobId, j) {
       j.photos.map(src => `<img src="${src}" class="photo">`).join('') +
       '</div>';
   }
-  return `${buildWorkBanner(j)}
+  return `${buildWorkBanner(j, posNum)}
 <div class="header">
   <div class="header-left">
     <h1>Job Ticket</h1>
@@ -1212,7 +1214,15 @@ ${photosHtml}
 function printJobTicket() {
   if (!editingId || !jobs[editingId]) return;
   const j = jobs[editingId];
-  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Job Ticket — ${j.customer || ''}</title><style>${buildTicketStyles()}</style></head><body>${buildTicketBodyHtml(editingId, j)}<div class="no-print" style="margin-top:24px;text-align:center;"><button onclick="window.print()" style="padding:10px 28px;background:#1D9E75;color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;">🖨 Print</button></div></body></html>`;
+  let posNum;
+  if (!j.unscheduled && j.week && j.day !== undefined && j.process) {
+    const sameProc = Object.entries(jobs)
+      .filter(([, x]) => !x.unscheduled && x.week === j.week && x.day === j.day && x.process === j.process)
+      .sort(([, a], [, b]) => (a.slot || 0) - (b.slot || 0));
+    const idx = sameProc.findIndex(([id]) => id === editingId);
+    if (idx >= 0) posNum = idx + 1;
+  }
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Job Ticket — ${j.customer || ''}</title><style>${buildTicketStyles()}</style></head><body>${buildTicketBodyHtml(editingId, j, posNum)}<div class="no-print" style="margin-top:24px;text-align:center;"><button onclick="window.print()" style="padding:10px 28px;background:#1D9E75;color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;">🖨 Print</button></div></body></html>`;
   const w = window.open('', '_blank');
   w.document.write(html);
   w.document.close();
@@ -1227,8 +1237,11 @@ function printDayTickets(di) {
       return pa !== pb ? pa - pb : (a.slot || 0) - (b.slot || 0);
     });
   if (!dayJobs.length) return;
+  const procCounters = {};
   const bodies = dayJobs.map(([id, j], i) => {
-    const content = buildTicketBodyHtml(id, j);
+    procCounters[j.process] = (procCounters[j.process] || 0) + 1;
+    const posNum = procCounters[j.process];
+    const content = buildTicketBodyHtml(id, j, posNum);
     return i < dayJobs.length - 1 ? `<div class="page-break">${content}</div>` : content;
   }).join('');
   const dayName = DAYS[di] || 'Day';
