@@ -1526,6 +1526,14 @@ function rsDayKey(di) {
   return d.toISOString().slice(0, 10);
 }
 
+// Returns the most recent prior calendar day that is Mon–Fri (local time).
+// Sat/Sun/Mon all step back to the preceding Friday.
+function getPreviousWorkingDay(date) {
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  do { d.setDate(d.getDate() - 1); } while (d.getDay() === 0 || d.getDay() === 6);
+  return d;
+}
+
 function rsEsc(s) {
   return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
@@ -1554,19 +1562,24 @@ function closeRsModal() {
 function rsBuildPreviews(di) {
   const today = new Date(); today.setHours(0,0,0,0);
 
-  // TAKEDOWN: all cooked/ready-pickup jobs across all weeks
-  const tdJobs = Object.entries(jobs).filter(([,j]) => j.status === 'cooked' || j.status === 'ready-pickup')
-    .sort(([,a],[,b]) => (a.statusUpdatedAt||0) - (b.statusUpdatedAt||0));
+  // TAKEDOWN: cooked/ready-pickup jobs whose status was set on the previous working day (local date)
+  const mon = getMondayOf(weekOffset);
+  const sheetDate = new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() + di);
+  const pwd = getPreviousWorkingDay(sheetDate);
+  const pwdStr = pwd.toLocaleDateString('en-US', {weekday:'long', month:'long', day:'numeric'});
+  const pwdDateStr = `${pwd.getFullYear()}-${String(pwd.getMonth()+1).padStart(2,'0')}-${String(pwd.getDate()).padStart(2,'0')}`;
+  const tdJobs = Object.entries(jobs).filter(([,j]) => {
+    if (j.status !== 'cooked' && j.status !== 'ready-pickup') return false;
+    if (!j.statusUpdatedAt) return false;
+    const t = new Date(j.statusUpdatedAt);
+    const localDate = `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
+    return localDate === pwdDateStr;
+  }).sort(([,a],[,b]) => (a.statusUpdatedAt||0) - (b.statusUpdatedAt||0));
   let tdLines = tdJobs.map(([,j]) => {
-    let age = '';
-    if (j.statusUpdatedAt) {
-      const days = Math.floor((Date.now() - j.statusUpdatedAt) / 86400000);
-      age = ` (${days <= 0 ? 'today' : days + (days === 1 ? ' day' : ' days')})`;
-    }
     const rack = j.rack ? ' — ' + j.rack : '';
-    return `${j.customer || '—'}${rack} — ${STATUS_LABELS[j.status] || j.status}${age}`;
+    return `${j.customer || '—'}${rack} — ${STATUS_LABELS[j.status] || j.status}`;
   });
-  document.getElementById('rs-preview-takedown').textContent = tdLines.length ? tdLines.join('\n') : '(none)';
+  document.getElementById('rs-preview-takedown').textContent = `From ${pwdStr}:\n` + (tdLines.length ? tdLines.join('\n') : '(none)');
 
   // BLAST / PREP / COAT: jobs on the board for this day
   const procOrder = {blast:0, prep:1, coat:2};
@@ -1691,20 +1704,22 @@ function buildRsHtml(di, plan) {
   const d = new Date(mon.getTime()); d.setDate(d.getDate() + di);
   const dateStr = d.toLocaleDateString('en-US', {weekday:'long', month:'long', day:'numeric', year:'numeric'}).toUpperCase();
 
-  // TAKEDOWN — all cooked/ready-pickup jobs
-  const tdJobs = Object.entries(jobs)
-    .filter(([,j]) => j.status === 'cooked' || j.status === 'ready-pickup')
-    .sort(([,a],[,b]) => (a.statusUpdatedAt||0) - (b.statusUpdatedAt||0));
+  // TAKEDOWN — cooked/ready-pickup jobs whose status was set on the previous working day (local date)
+  const pwd = getPreviousWorkingDay(d);
+  const pwdLabel = pwd.toLocaleDateString('en-US', {weekday:'long', month:'long', day:'numeric'});
+  const pwdDateStr = `${pwd.getFullYear()}-${String(pwd.getMonth()+1).padStart(2,'0')}-${String(pwd.getDate()).padStart(2,'0')}`;
+  const tdJobs = Object.entries(jobs).filter(([,j]) => {
+    if (j.status !== 'cooked' && j.status !== 'ready-pickup') return false;
+    if (!j.statusUpdatedAt) return false;
+    const t = new Date(j.statusUpdatedAt);
+    const localDate = `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
+    return localDate === pwdDateStr;
+  }).sort(([,a],[,b]) => (a.statusUpdatedAt||0) - (b.statusUpdatedAt||0));
   let tdHtml = '';
   if (tdJobs.length) {
     tdHtml = tdJobs.map(([,j]) => {
-      let age = '';
-      if (j.statusUpdatedAt) {
-        const days = Math.floor((Date.now() - j.statusUpdatedAt) / 86400000);
-        age = `<span class="rs-age">(${days <= 0 ? 'today' : days + (days === 1 ? ' day' : ' days')})</span>`;
-      }
       const rack = j.rack ? ` <span class="rs-job-meta">— ${rsEsc(j.rack)}</span>` : '';
-      return `<div class="rs-job"><strong>${rsEsc(j.customer||'—')}</strong>${rack} <span class="rs-job-meta">— ${STATUS_LABELS[j.status]||j.status}</span> ${age}</div>`;
+      return `<div class="rs-job"><strong>${rsEsc(j.customer||'—')}</strong>${rack} <span class="rs-job-meta">— ${STATUS_LABELS[j.status]||j.status}</span></div>`;
     }).join('');
   } else {
     tdHtml = '<div class="rs-empty">—</div>';
@@ -1758,7 +1773,7 @@ function buildRsHtml(di, plan) {
   <div class="rs-date">${dateStr}</div>
   ${cycleHtml}${mustHtml}
 </div>
-<div class="rs-section"><div class="rs-section-head">TAKEDOWN</div>${tdNote}${tdHtml}</div>
+<div class="rs-section"><div class="rs-section-head">TAKEDOWN <span style="font-size:9pt;font-weight:500;">(from ${rsEsc(pwdLabel)})</span></div>${tdNote}${tdHtml}</div>
 <div class="rs-section"><div class="rs-section-head">CUSTOMERS COMING TODAY</div>${custHtml}</div>
 ${procSection('blast','Blast')}
 ${procSection('prep','Prep')}
