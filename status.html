@@ -167,22 +167,24 @@ function confirmUpdate() {
   spinner.style.display = 'block';
   result.textContent = '';
 
-  db.ref('jobs/' + jobId + '/status').set(newStatus, err => {
+  const updates = { status: newStatus, statusUpdatedAt: Date.now() };
+  Promise.all([
+    db.ref('jobs/' + jobId + '/status').set(newStatus),
+    db.ref('jobs/' + jobId + '/statusUpdatedAt').set(Date.now())
+  ]).then(() => {
     spinner.style.display = 'none';
-    if (err) {
-      result.className = 'result error';
-      result.textContent = '✗ Update failed. Please try again.';
-      btn.disabled = false;
-    } else {
-      result.className = 'result success';
-      result.textContent = '✓ Status updated to "' + STATUS_LABELS[newStatus] + '"';
-      btn.style.display = 'none';
-      // Refresh job info
-      jobData.status = newStatus;
-      showContent();
-      document.getElementById('result').className = 'result success';
-      document.getElementById('result').textContent = '✓ Status updated to "' + STATUS_LABELS[newStatus] + '"';
-    }
+    result.className = 'result success';
+    result.textContent = '✓ Status updated to "' + STATUS_LABELS[newStatus] + '"';
+    btn.style.display = 'none';
+    jobData.status = newStatus;
+    showContent();
+    document.getElementById('result').className = 'result success';
+    document.getElementById('result').textContent = '✓ Status updated to "' + STATUS_LABELS[newStatus] + '"';
+  }).catch(err => {
+    spinner.style.display = 'none';
+    result.className = 'result error';
+    result.textContent = '✗ Update failed. Please try again.';
+    btn.disabled = false;
   });
 }
 

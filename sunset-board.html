@@ -216,6 +216,33 @@
   .setup .note { font-size: 11px; color: var(--text3); margin-top: 12px; }
   .si-error { color: #A32D2D; font-size: 13px; margin-bottom: 8px; display: none; }
   .signout-btn { padding: 5px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); font-size: 12px; cursor: pointer; color: var(--text2); }
+  .rs-btn { padding: 2px 6px; background: none; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 12px; cursor: pointer; color: var(--text3); line-height: 1; display: none; }
+  .rs-btn:hover { border-color: #5B3FA6; color: #5B3FA6; }
+  body[data-role="admin"] .rs-btn { display: inline-block; }
+  /* Run-sheet modal */
+  #rs-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 110; align-items: flex-start; justify-content: center; padding: 16px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  #rs-overlay.open { display: flex; }
+  #rs-modal { background: var(--surface); border-radius: var(--radius); padding: 20px; width: 100%; max-width: 480px; margin: auto; }
+  #rs-modal h2 { font-size: 16px; font-weight: 700; margin-bottom: 14px; }
+  .rs-field { margin-bottom: 14px; }
+  .rs-field label { display: block; font-size: 12px; color: var(--text2); margin-bottom: 4px; font-weight: 600; }
+  .rs-field input[type=text], .rs-field input[type=number], .rs-field textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 15px; font-family: inherit; background: var(--surface); color: var(--text); -webkit-appearance: none; }
+  .rs-field input:focus, .rs-field textarea:focus { outline: none; border-color: var(--teal); }
+  .rs-field textarea { resize: vertical; min-height: 72px; }
+  .rs-counter { font-size: 11px; color: var(--text3); text-align: right; margin-top: 2px; }
+  .rs-preview-box { background: var(--bg); border-radius: var(--radius-sm); padding: 10px 12px; margin-bottom: 8px; font-size: 12px; color: var(--text2); white-space: pre-wrap; line-height: 1.5; font-style: italic; min-height: 32px; }
+  .rs-preview-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text3); margin-bottom: 4px; }
+  details.rs-group { border: 1px solid var(--border); border-radius: var(--radius-sm); margin-bottom: 10px; }
+  details.rs-group summary { padding: 12px 14px; font-size: 14px; font-weight: 700; cursor: pointer; list-style: none; display: flex; align-items: center; justify-content: space-between; user-select: none; }
+  details.rs-group summary::-webkit-details-marker { display: none; }
+  details.rs-group summary::after { content: '▸'; color: var(--text3); transition: transform 0.15s; }
+  details.rs-group[open] summary::after { transform: rotate(90deg); }
+  details.rs-group .rs-group-body { padding: 0 14px 14px; }
+  .rs-modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; flex-wrap: wrap; }
+  .rs-btn-save { padding: 12px 20px; background: var(--teal); color: #fff; border: none; border-radius: var(--radius-sm); font-size: 15px; font-weight: 700; cursor: pointer; flex: 1; min-height: 48px; }
+  .rs-btn-save:hover { background: var(--teal-dark); }
+  .rs-btn-cancel { padding: 12px 16px; border: 1px solid var(--border); background: none; color: var(--text2); border-radius: var(--radius-sm); font-size: 15px; cursor: pointer; min-height: 48px; }
+  .rs-btn-remove { padding: 12px 16px; border: 1px solid #E24B4A; background: none; color: #A32D2D; border-radius: var(--radius-sm); font-size: 15px; cursor: pointer; margin-right: auto; min-height: 48px; }
 </style>
 </head>
 <body>
@@ -440,6 +467,97 @@
   </div>
 </div>
 
+<!-- RUN SHEET MODAL (admin only) -->
+<div id="rs-overlay" onclick="rsOverlayClick(event)">
+  <div id="rs-modal">
+    <h2 id="rs-title">Daily Run Sheet</h2>
+
+    <div class="rs-field">
+      <label>Date</label>
+      <div id="rs-date-display" style="font-size:15px;font-weight:600;color:var(--text);padding:4px 0;"></div>
+    </div>
+
+    <div class="rs-field">
+      <label>Oven Cycle Target <span style="font-weight:400;color:var(--text3);">(optional)</span></label>
+      <input type="number" id="rs-cycle-target" min="1" max="30" placeholder="e.g. 3">
+    </div>
+
+    <div class="rs-field">
+      <label>Must Ship Today <span style="font-weight:400;color:var(--text3);">(optional — prints large and bold)</span></label>
+      <input type="text" id="rs-must-ship" placeholder="e.g. Henderson trailer — must leave by 3 pm">
+    </div>
+
+    <details class="rs-group" open>
+      <summary>Customers Coming Today</summary>
+      <div class="rs-group-body">
+        <div class="rs-field">
+          <label>Free text — pickups, dropoffs, walk-ins, deliveries</label>
+          <textarea id="rs-note-customers" maxlength="400" placeholder="e.g. Johnson pickup ~10am&#10;Henderson dropping off new trailer" oninput="rsCount(this,'rs-cnt-customers')"></textarea>
+          <div class="rs-counter"><span id="rs-cnt-customers">0</span>/400</div>
+        </div>
+      </div>
+    </details>
+
+    <details class="rs-group">
+      <summary>Takedown</summary>
+      <div class="rs-group-body">
+        <div class="rs-preview-label">Auto-detected (cooked / ready for pickup)</div>
+        <div class="rs-preview-box" id="rs-preview-takedown"></div>
+        <div class="rs-field">
+          <label>Notes for crew (prints above the list)</label>
+          <textarea id="rs-note-takedown" maxlength="400" placeholder="e.g. Rack 3 needs to be broken down before pulling Friday's batch" oninput="rsCount(this,'rs-cnt-takedown')"></textarea>
+          <div class="rs-counter"><span id="rs-cnt-takedown">0</span>/400</div>
+        </div>
+      </div>
+    </details>
+
+    <details class="rs-group">
+      <summary>Blast</summary>
+      <div class="rs-group-body">
+        <div class="rs-preview-label">Auto-generated from today's board</div>
+        <div class="rs-preview-box" id="rs-preview-blast"></div>
+        <div class="rs-field">
+          <label>Notes for crew (prints above the list)</label>
+          <textarea id="rs-note-blast" maxlength="400" placeholder="e.g. Starblast hopper is low, refill before the trailer frame" oninput="rsCount(this,'rs-cnt-blast')"></textarea>
+          <div class="rs-counter"><span id="rs-cnt-blast">0</span>/400</div>
+        </div>
+      </div>
+    </details>
+
+    <details class="rs-group">
+      <summary>Prep</summary>
+      <div class="rs-group-body">
+        <div class="rs-preview-label">Auto-generated from today's board</div>
+        <div class="rs-preview-box" id="rs-preview-prep"></div>
+        <div class="rs-field">
+          <label>Notes for crew (prints above the list)</label>
+          <textarea id="rs-note-prep" maxlength="400" placeholder="e.g. Henderson job is a repeat customer who inspects closely" oninput="rsCount(this,'rs-cnt-prep')"></textarea>
+          <div class="rs-counter"><span id="rs-cnt-prep">0</span>/400</div>
+        </div>
+      </div>
+    </details>
+
+    <details class="rs-group">
+      <summary>Coat</summary>
+      <div class="rs-group-body">
+        <div class="rs-preview-label">Auto-generated from today's board</div>
+        <div class="rs-preview-box" id="rs-preview-coat"></div>
+        <div class="rs-field">
+          <label>Notes for crew (prints above the list)</label>
+          <textarea id="rs-note-coat" maxlength="400" placeholder="e.g. Oven ran hot yesterday, verify temp on first cycle" oninput="rsCount(this,'rs-cnt-coat')"></textarea>
+          <div class="rs-counter"><span id="rs-cnt-coat">0</span>/400</div>
+        </div>
+      </div>
+    </details>
+
+    <div class="rs-modal-actions">
+      <button class="rs-btn-remove" id="rs-btn-remove" style="display:none;" onclick="removeRunSheet()">Remove from Print</button>
+      <button class="rs-btn-cancel" onclick="closeRsModal()">Cancel</button>
+      <button class="rs-btn-save" onclick="saveRunSheet()">Save &amp; Include in Print</button>
+    </div>
+  </div>
+</div>
+
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -633,7 +751,7 @@ function render() {
     const colDate = new Date(mon); colDate.setDate(mon.getDate()+di);
     const col = document.createElement('div');
     col.className = 'day-col' + (isToday(colDate) ? ' today' : '') + (di >= 5 ? ' weekend' : '');
-    col.innerHTML = '<div class="day-header" style="display:flex;align-items:flex-start;justify-content:space-between;"><div><div class="day-name">'+DAYS[di]+'</div><div class="day-date">'+fmtDate(colDate)+'</div></div><button class="print-all-btn" onclick="printDayTickets('+di+')" title="Print all jobs for this day">🖨</button></div>';
+    col.innerHTML = '<div class="day-header" style="display:flex;align-items:flex-start;justify-content:space-between;"><div><div class="day-name">'+DAYS[di]+'</div><div class="day-date">'+fmtDate(colDate)+'</div></div><div style="display:flex;gap:4px;align-items:center;"><button class="rs-btn" onclick="openRsModal('+di+')" title="Daily Run Sheet">📋</button><button class="print-all-btn" onclick="printDayTickets('+di+')" title="Print all jobs for this day">🖨</button></div></div>';
     const grid = document.createElement('div');
     grid.className = 'process-grid';
 
@@ -819,7 +937,7 @@ function makeCard(id, job, isParking) {
   return card;
 }
 
-function cycleStatus(id, job) { const statuses=getStatuses(job.process); const i=statuses.indexOf(job.status||statuses[0]); db.ref('jobs/'+id+'/status').set(statuses[(i+1)%statuses.length]); }
+function cycleStatus(id, job) { const statuses=getStatuses(job.process); const i=statuses.indexOf(job.status||statuses[0]); const ns=statuses[(i+1)%statuses.length]; db.ref('jobs/'+id).update({status:ns, statusUpdatedAt:Date.now()}); }
 function populateStatusDropdown(process, currentStatus) {
   const sel = document.getElementById('f-status');
   const statuses = getStatuses(process);
@@ -1009,7 +1127,8 @@ function saveJob() {
     powderEta: document.getElementById('f-powder-ordered').checked ? document.getElementById('f-powder-eta').value : '',
     expectedArrival: document.getElementById('f-expected-arrival').value || '',
     pickup: document.getElementById('f-pickup').value || '',
-    photos: currentPhotos.slice()
+    photos: currentPhotos.slice(),
+    statusUpdatedAt: Date.now()
   };
   if (editingId) db.ref('jobs/'+editingId).update(job);
   else db.ref('jobs').push(job);
@@ -1230,7 +1349,7 @@ function printJobTicket() {
   w.document.close();
 }
 
-function printDayTickets(di) {
+async function printDayTickets(di) {
   const procOrder = {blast: 0, prep: 1, coat: 2};
   const dayJobs = Object.entries(jobs)
     .filter(([id, j]) => !j.unscheduled && j.week === weekKey() && j.day === di)
@@ -1247,7 +1366,19 @@ function printDayTickets(di) {
     return i < dayJobs.length - 1 ? `<div class="page-break">${content}</div>` : content;
   }).join('');
   const dayName = DAYS[di] || 'Day';
-  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Job Tickets — ${dayName}</title><style>${buildTicketStyles()}</style></head><body>${bodies}<div class="no-print" style="margin-top:24px;text-align:center;"><button onclick="window.print()" style="padding:10px 28px;background:#1D9E75;color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;">🖨 Print All (${dayJobs.length} tickets)</button></div></body></html>`;
+
+  // Prepend run sheet if a saved plan exists for this day (admin only)
+  let runSheetHtml = '';
+  if (userRole === 'admin') {
+    const key = rsDayKey(di);
+    const snap = await db.ref('dailyPlans/' + key).once('value');
+    const plan = snap.val();
+    if (plan) {
+      runSheetHtml = buildRsHtml(di, plan) + '<div class="page-break"></div>';
+    }
+  }
+
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Job Tickets — ${dayName}</title><style>${buildTicketStyles()}${buildRsStyles()}</style></head><body>${runSheetHtml}${bodies}<div class="no-print" style="margin-top:24px;text-align:center;"><button onclick="window.print()" style="padding:10px 28px;background:#1D9E75;color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;">🖨 Print All (${dayJobs.length} tickets)</button></div></body></html>`;
   const w = window.open('', '_blank');
   w.document.write(html);
   w.document.close();
@@ -1379,6 +1510,252 @@ function startTouchDrag(e, id, card) {
 
   document.addEventListener('touchmove', onMove, { passive: true });
   document.addEventListener('touchend', onEnd);
+}
+
+// ===== DAILY RUN SHEET =====
+// Role: admin only. Button visible via CSS body[data-role="admin"] .rs-btn.
+// Data saved under dailyPlans/YYYY-MM-DD in Firebase.
+
+let rsCurrentDi = null;   // day-index (0=Mon … 6=Sun) for the open modal
+let rsCurrentKey = null;  // YYYY-MM-DD for the open modal
+
+function rsDayKey(di) {
+  const mon = getMondayOf(weekOffset);
+  const d = new Date(mon.getTime());
+  d.setDate(d.getDate() + di);
+  return d.toISOString().slice(0, 10);
+}
+
+function rsEsc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function rsIsNonStandardCure(j) {
+  if (!j.color || !COLORS[j.color]) return false;
+  const r = COLORS[j.color];
+  return String(j.cureTemp)  !== String(r.cureTemp)  || String(j.cureTime)  !== String(r.cureTime)  ||
+         String(j.cureTemp2) !== String(r.cureTemp2) || String(j.cureTime2) !== String(r.cureTime2) ||
+         String(j.cureTemp3) !== String(r.cureTemp3) || String(j.cureTime3) !== String(r.cureTime3);
+}
+
+function rsCount(el, counterId) {
+  document.getElementById(counterId).textContent = el.value.length;
+}
+
+function rsOverlayClick(e) {
+  if (e.target === document.getElementById('rs-overlay')) closeRsModal();
+}
+
+function closeRsModal() {
+  document.getElementById('rs-overlay').classList.remove('open');
+}
+
+// Build text previews shown in modal for each auto section
+function rsBuildPreviews(di) {
+  const today = new Date(); today.setHours(0,0,0,0);
+
+  // TAKEDOWN: all cooked/ready-pickup jobs across all weeks
+  const tdJobs = Object.entries(jobs).filter(([,j]) => j.status === 'cooked' || j.status === 'ready-pickup')
+    .sort(([,a],[,b]) => (a.statusUpdatedAt||0) - (b.statusUpdatedAt||0));
+  let tdLines = tdJobs.map(([,j]) => {
+    let age = '';
+    if (j.statusUpdatedAt) {
+      const days = Math.floor((Date.now() - j.statusUpdatedAt) / 86400000);
+      age = ` (${days <= 0 ? 'today' : days + (days === 1 ? ' day' : ' days')})`;
+    }
+    const rack = j.rack ? ' — ' + j.rack : '';
+    return `${j.customer || '—'}${rack} — ${STATUS_LABELS[j.status] || j.status}${age}`;
+  });
+  document.getElementById('rs-preview-takedown').textContent = tdLines.length ? tdLines.join('\n') : '(none)';
+
+  // BLAST / PREP / COAT: jobs on the board for this day
+  const procOrder = {blast:0, prep:1, coat:2};
+  const dayJobs = Object.entries(jobs)
+    .filter(([,j]) => !j.unscheduled && j.week === weekKey() && j.day === di)
+    .sort(([,a],[,b]) => {
+      const pa = procOrder[a.process]??0, pb = procOrder[b.process]??0;
+      return pa !== pb ? pa - pb : (a.slot||0) - (b.slot||0);
+    });
+  const cnt = {}, byProc = {blast:[],prep:[],coat:[]};
+  dayJobs.forEach(([,j]) => {
+    cnt[j.process] = (cnt[j.process]||0) + 1;
+    if (byProc[j.process]) byProc[j.process].push({j, n: cnt[j.process]});
+  });
+
+  document.getElementById('rs-preview-blast').textContent =
+    byProc.blast.length ? byProc.blast.map(({j,n}) => `Blast ${n}: ${j.customer||'—'}${j.desc?' — '+j.desc:''}`).join('\n') : '(none)';
+  document.getElementById('rs-preview-prep').textContent =
+    byProc.prep.length  ? byProc.prep.map(({j,n})  => `Prep ${n}: ${j.customer||'—'}${j.desc?' — '+j.desc:''}`).join('\n')  : '(none)';
+  document.getElementById('rs-preview-coat').textContent =
+    byProc.coat.length  ? byProc.coat.map(({j,n})  => {
+      const sup = j.color ? (j.color.match(/\(([^)]+)\)$/)||[])[1]||'' : '';
+      const nonStd = rsIsNonStandardCure(j) ? ' ⚠ CUSTOM CURE' : '';
+      return `Coat ${n}: ${j.customer||'—'} — ${j.color||'—'}${sup?' ['+sup+']':''}${nonStd}`;
+    }).join('\n') : '(none)';
+}
+
+async function openRsModal(di) {
+  if (userRole !== 'admin') return;
+  rsCurrentDi = di;
+  rsCurrentKey = rsDayKey(di);
+
+  // Date display
+  const mon = getMondayOf(weekOffset);
+  const d = new Date(mon.getTime()); d.setDate(d.getDate() + di);
+  const dateDisplay = d.toLocaleDateString('en-US', {weekday:'long', month:'long', day:'numeric', year:'numeric'});
+  document.getElementById('rs-date-display').textContent = dateDisplay;
+  document.getElementById('rs-title').textContent = 'Run Sheet — ' + DAYS[di];
+
+  // Build auto previews
+  rsBuildPreviews(di);
+
+  // Load existing plan
+  const snap = await db.ref('dailyPlans/' + rsCurrentKey).once('value');
+  const plan = snap.val();
+
+  document.getElementById('rs-cycle-target').value = plan ? (plan.cycleTarget || '') : '';
+  document.getElementById('rs-must-ship').value = plan ? (plan.mustShip || '') : '';
+  ['customers','takedown','blast','prep','coat'].forEach(k => {
+    const el = document.getElementById('rs-note-' + k);
+    el.value = plan ? (plan['notes_' + k] || '') : '';
+    rsCount(el, 'rs-cnt-' + k);
+  });
+
+  document.getElementById('rs-btn-remove').style.display = plan ? '' : 'none';
+  document.getElementById('rs-overlay').classList.add('open');
+}
+
+async function saveRunSheet() {
+  const plan = {
+    cycleTarget: document.getElementById('rs-cycle-target').value.trim(),
+    mustShip:    document.getElementById('rs-must-ship').value.trim(),
+    notes_customers: document.getElementById('rs-note-customers').value,
+    notes_takedown:  document.getElementById('rs-note-takedown').value,
+    notes_blast:     document.getElementById('rs-note-blast').value,
+    notes_prep:      document.getElementById('rs-note-prep').value,
+    notes_coat:      document.getElementById('rs-note-coat').value,
+    savedAt: Date.now()
+  };
+  await db.ref('dailyPlans/' + rsCurrentKey).set(plan);
+  document.getElementById('rs-btn-remove').style.display = '';
+  closeRsModal();
+}
+
+async function removeRunSheet() {
+  if (!confirm('Remove the run sheet for this date? Print All will revert to job tickets only.')) return;
+  await db.ref('dailyPlans/' + rsCurrentKey).remove();
+  closeRsModal();
+}
+
+// ===== RUN SHEET PRINT STYLES (injected alongside ticket styles) =====
+function buildRsStyles() {
+  return `
+  .rs-page { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+  .rs-header { border-bottom: 3px solid #1a1a18; padding-bottom: 10px; margin-bottom: 12px; }
+  .rs-title  { font-size: 16pt; font-weight: 900; letter-spacing: 0.04em; line-height: 1.2; }
+  .rs-date   { font-size: 12pt; font-weight: 700; margin-top: 3px; }
+  .rs-cycle  { font-size: 11pt; margin-top: 6px; }
+  .rs-must   { font-size: 14pt; font-weight: 900; margin-top: 8px; border: 2.5px solid #1a1a18; padding: 7px 12px; display: inline-block; }
+  .rs-section        { margin-bottom: 9px; }
+  .rs-section-head   { font-size: 14pt; font-weight: 900; text-transform: uppercase; border-bottom: 1.5px solid #1a1a18; padding-bottom: 1px; margin-bottom: 3px; letter-spacing: 0.04em; }
+  .rs-note           { font-size: 10pt; font-style: italic; padding-left: 10px; border-left: 2px solid #bbb; margin-bottom: 3px; white-space: pre-line; color: #555; line-height: 1.4; }
+  .rs-job            { font-size: 11pt; padding: 1px 0; line-height: 1.4; }
+  .rs-job-meta       { color: #555; font-size: 10pt; }
+  .rs-age            { font-size: 9pt; color: #888; font-style: italic; margin-left: 3px; }
+  .rs-empty          { color: #aaa; font-style: italic; font-size: 11pt; }
+  .rs-warn           { color: #c0392b; font-weight: 700; font-size: 9pt; }
+  .rs-footer         { border-top: 2px solid #1a1a18; margin-top: 12px; padding-top: 8px; }
+  .rs-footer-title   { font-size: 11pt; font-weight: 900; text-align: center; margin-bottom: 8px; letter-spacing: 0.12em; }
+  .rs-writein        { font-size: 11pt; margin-bottom: 10px; }
+  .rs-writein-line   { display: inline-block; border-bottom: 1.5px solid #1a1a18; min-width: 170px; }
+  `;
+}
+
+// ===== RUN SHEET HTML (used at print time — always reflects live board data) =====
+function buildRsHtml(di, plan) {
+  const mon = getMondayOf(weekOffset);
+  const d = new Date(mon.getTime()); d.setDate(d.getDate() + di);
+  const dateStr = d.toLocaleDateString('en-US', {weekday:'long', month:'long', day:'numeric', year:'numeric'}).toUpperCase();
+
+  // TAKEDOWN — all cooked/ready-pickup jobs
+  const tdJobs = Object.entries(jobs)
+    .filter(([,j]) => j.status === 'cooked' || j.status === 'ready-pickup')
+    .sort(([,a],[,b]) => (a.statusUpdatedAt||0) - (b.statusUpdatedAt||0));
+  let tdHtml = '';
+  if (tdJobs.length) {
+    tdHtml = tdJobs.map(([,j]) => {
+      let age = '';
+      if (j.statusUpdatedAt) {
+        const days = Math.floor((Date.now() - j.statusUpdatedAt) / 86400000);
+        age = `<span class="rs-age">(${days <= 0 ? 'today' : days + (days === 1 ? ' day' : ' days')})</span>`;
+      }
+      const rack = j.rack ? ` <span class="rs-job-meta">— ${rsEsc(j.rack)}</span>` : '';
+      return `<div class="rs-job"><strong>${rsEsc(j.customer||'—')}</strong>${rack} <span class="rs-job-meta">— ${STATUS_LABELS[j.status]||j.status}</span> ${age}</div>`;
+    }).join('');
+  } else {
+    tdHtml = '<div class="rs-empty">—</div>';
+  }
+
+  // Day jobs for blast/prep/coat
+  const procOrder = {blast:0, prep:1, coat:2};
+  const dayJobs = Object.entries(jobs)
+    .filter(([,j]) => !j.unscheduled && j.week === weekKey() && j.day === di)
+    .sort(([,a],[,b]) => {
+      const pa = procOrder[a.process]??0, pb = procOrder[b.process]??0;
+      return pa !== pb ? pa - pb : (a.slot||0) - (b.slot||0);
+    });
+  const cnt = {}, byProc = {blast:[],prep:[],coat:[]};
+  dayJobs.forEach(([,j]) => {
+    cnt[j.process] = (cnt[j.process]||0) + 1;
+    if (byProc[j.process]) byProc[j.process].push({j, n: cnt[j.process]});
+  });
+
+  function procSection(proc, label) {
+    const note = plan['notes_' + proc] || '';
+    const noteHtml = note ? `<div class="rs-note">${rsEsc(note).replace(/\n/g,'<br>')}</div>` : '';
+    const items = byProc[proc] || [];
+    let rowsHtml = '';
+    if (proc === 'coat') {
+      rowsHtml = items.map(({j,n}) => {
+        const sup = j.color ? (j.color.match(/\(([^)]+)\)$/)||[])[1]||'' : '';
+        const colorStr = j.color ? rsEsc(j.color) + (sup ? ` <span class="rs-job-meta">[${rsEsc(sup)}]</span>` : '') : '<em class="rs-empty">no color</em>';
+        const nonStd = rsIsNonStandardCure(j) ? ' <span class="rs-warn">⚠ CUSTOM CURE</span>' : '';
+        return `<div class="rs-job"><strong>${label} ${n}: ${rsEsc(j.customer||'—')}</strong> <span class="rs-job-meta">— ${colorStr}</span>${nonStd}</div>`;
+      }).join('');
+    } else {
+      rowsHtml = items.map(({j,n}) => {
+        const desc = j.desc ? ` <span class="rs-job-meta">— ${rsEsc(j.desc)}</span>` : '';
+        return `<div class="rs-job"><strong>${label} ${n}: ${rsEsc(j.customer||'—')}</strong>${desc}</div>`;
+      }).join('');
+    }
+    if (!rowsHtml) rowsHtml = '<div class="rs-empty">—</div>';
+    return `<div class="rs-section"><div class="rs-section-head">${label.toUpperCase()}</div>${noteHtml}${rowsHtml}</div>`;
+  }
+
+  const cycleHtml = plan.cycleTarget ? `<div class="rs-cycle">Oven cycle target: <strong>${rsEsc(String(plan.cycleTarget))}</strong></div>` : '';
+  const mustHtml  = plan.mustShip    ? `<div class="rs-must">MUST SHIP TODAY: ${rsEsc(plan.mustShip)}</div>` : '';
+  const tdNote = plan.notes_takedown ? `<div class="rs-note">${rsEsc(plan.notes_takedown).replace(/\n/g,'<br>')}</div>` : '';
+  const custNote = plan.notes_customers || '';
+  const custHtml = custNote ? `<div class="rs-note" style="border:none;padding-left:0;font-size:11pt;">${rsEsc(custNote).replace(/\n/g,'<br>')}</div>` : '<div class="rs-empty">—</div>';
+
+  return `<div class="rs-page">
+<div class="rs-header">
+  <div class="rs-title">SUNSET POWDER COATING — DAILY RUN SHEET</div>
+  <div class="rs-date">${dateStr}</div>
+  ${cycleHtml}${mustHtml}
+</div>
+<div class="rs-section"><div class="rs-section-head">TAKEDOWN</div>${tdNote}${tdHtml}</div>
+<div class="rs-section"><div class="rs-section-head">CUSTOMERS COMING TODAY</div>${custHtml}</div>
+${procSection('blast','Blast')}
+${procSection('prep','Prep')}
+${procSection('coat','Coat')}
+<div class="rs-footer">
+  <div class="rs-footer-title">— END OF DAY —</div>
+  <div class="rs-writein">Oven cycles run: <span class="rs-writein-line">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></div>
+  <div class="rs-writein">Jobs completed: <span class="rs-writein-line">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></div>
+  <div class="rs-writein">Anything stuck (and why): <span class="rs-writein-line" style="min-width:280px;">&nbsp;</span></div>
+</div>
+</div>`;
 }
 
 window.addEventListener('load', () => {
