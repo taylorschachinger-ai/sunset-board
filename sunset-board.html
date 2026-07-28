@@ -482,13 +482,14 @@
     </div>
 
     <div class="rs-field">
-      <label>Oven Cycle Target <span style="font-weight:400;color:var(--text3);">(optional)</span></label>
-      <input type="number" id="rs-cycle-target" min="1" max="30" placeholder="e.g. 3">
+      <label>Top Priorities <span style="font-weight:400;color:var(--text3);">(optional — prints at top if filled in)</span></label>
+      <textarea id="rs-note-priorities" maxlength="600" placeholder="e.g. Henderson trailer must leave by 3pm&#10;Confirm oven temp before first coat cycle" oninput="rsCount(this,'rs-cnt-priorities')"></textarea>
+      <div class="rs-counter"><span id="rs-cnt-priorities">0</span>/600</div>
     </div>
 
     <div class="rs-field">
-      <label>Must Ship Today <span style="font-weight:400;color:var(--text3);">(optional — prints large and bold)</span></label>
-      <input type="text" id="rs-must-ship" placeholder="e.g. Henderson trailer — must leave by 3 pm">
+      <label>Oven Cycle Target <span style="font-weight:400;color:var(--text3);">(optional)</span></label>
+      <input type="number" id="rs-cycle-target" min="1" max="30" placeholder="e.g. 3">
     </div>
 
     <details class="rs-group" open>
@@ -1702,7 +1703,8 @@ async function openRsModal(di) {
 
   // Clear fields and open modal immediately so it's never blocked by a network error
   document.getElementById('rs-cycle-target').value = '';
-  document.getElementById('rs-must-ship').value = '';
+  const priEl = document.getElementById('rs-note-priorities');
+  priEl.value = ''; rsCount(priEl, 'rs-cnt-priorities');
   ['customers','takedown','blast','prep','coat'].forEach(k => {
     const el = document.getElementById('rs-note-' + k);
     el.value = '';
@@ -1717,7 +1719,8 @@ async function openRsModal(di) {
     const plan = snap.val();
     if (plan) {
       document.getElementById('rs-cycle-target').value = plan.cycleTarget || '';
-      document.getElementById('rs-must-ship').value = plan.mustShip || '';
+      const priEl2 = document.getElementById('rs-note-priorities');
+      priEl2.value = plan.notes_priorities || ''; rsCount(priEl2, 'rs-cnt-priorities');
       ['customers','takedown','blast','prep','coat'].forEach(k => {
         const el = document.getElementById('rs-note-' + k);
         el.value = plan['notes_' + k] || '';
@@ -1732,9 +1735,9 @@ async function openRsModal(di) {
 
 async function saveRunSheet() {
   const plan = {
-    cycleTarget: document.getElementById('rs-cycle-target').value.trim(),
-    mustShip:    document.getElementById('rs-must-ship').value.trim(),
-    notes_customers: document.getElementById('rs-note-customers').value,
+    cycleTarget:      document.getElementById('rs-cycle-target').value.trim(),
+    notes_priorities: document.getElementById('rs-note-priorities').value,
+    notes_customers:  document.getElementById('rs-note-customers').value,
     notes_takedown:  document.getElementById('rs-note-takedown').value,
     notes_blast:     document.getElementById('rs-note-blast').value,
     notes_prep:      document.getElementById('rs-note-prep').value,
@@ -1760,7 +1763,6 @@ function buildRsStyles() {
   .rs-title  { font-size: 16pt; font-weight: 900; letter-spacing: 0.04em; line-height: 1.2; }
   .rs-date   { font-size: 12pt; font-weight: 700; margin-top: 3px; }
   .rs-cycle  { font-size: 11pt; margin-top: 6px; }
-  .rs-must   { font-size: 14pt; font-weight: 900; margin-top: 8px; border: 2.5px solid #1a1a18; padding: 7px 12px; display: inline-block; }
   .rs-section        { margin-bottom: 9px; }
   .rs-section-head   { font-size: 14pt; font-weight: 900; text-transform: uppercase; border-bottom: 1.5px solid #1a1a18; padding-bottom: 1px; margin-bottom: 3px; letter-spacing: 0.04em; }
   .rs-note           { font-size: 10pt; font-style: italic; padding-left: 10px; border-left: 2px solid #bbb; margin-bottom: 3px; white-space: pre-line; color: #555; line-height: 1.4; }
@@ -1769,10 +1771,6 @@ function buildRsStyles() {
   .rs-age            { font-size: 9pt; color: #888; font-style: italic; margin-left: 3px; }
   .rs-empty          { color: #aaa; font-style: italic; font-size: 11pt; }
   .rs-warn           { color: #c0392b; font-weight: 700; font-size: 9pt; }
-  .rs-footer         { border-top: 2px solid #1a1a18; margin-top: 12px; padding-top: 8px; }
-  .rs-footer-title   { font-size: 11pt; font-weight: 900; text-align: center; margin-bottom: 8px; letter-spacing: 0.12em; }
-  .rs-writein        { font-size: 11pt; margin-bottom: 10px; }
-  .rs-writein-line   { display: inline-block; border-bottom: 1.5px solid #1a1a18; min-width: 170px; }
   `;
 }
 
@@ -1840,7 +1838,7 @@ function buildRsHtml(di, plan) {
   }
 
   const cycleHtml = plan.cycleTarget ? `<div class="rs-cycle">Oven cycle target: <strong>${rsEsc(String(plan.cycleTarget))}</strong></div>` : '';
-  const mustHtml  = plan.mustShip    ? `<div class="rs-must">MUST SHIP TODAY: ${rsEsc(plan.mustShip)}</div>` : '';
+  const priNote = plan.notes_priorities ? `<div class="rs-section"><div class="rs-section-head">TOP PRIORITIES</div><div class="rs-note" style="border:none;padding-left:0;font-size:11pt;">${rsEsc(plan.notes_priorities).replace(/\n/g,'<br>')}</div></div>` : '';
   const tdNote = plan.notes_takedown ? `<div class="rs-note">${rsEsc(plan.notes_takedown).replace(/\n/g,'<br>')}</div>` : '';
   const custNote = plan.notes_customers || '';
   const custHtml = custNote ? `<div class="rs-note" style="border:none;padding-left:0;font-size:11pt;">${rsEsc(custNote).replace(/\n/g,'<br>')}</div>` : '<div class="rs-empty">—</div>';
@@ -1849,19 +1847,13 @@ function buildRsHtml(di, plan) {
 <div class="rs-header">
   <div class="rs-title">SUNSET POWDER COATING — DAILY RUN SHEET</div>
   <div class="rs-date">${dateStr}</div>
-  ${cycleHtml}${mustHtml}
+  ${cycleHtml}
 </div>
-<div class="rs-section"><div class="rs-section-head">TAKEDOWN <span style="font-size:9pt;font-weight:500;">(from ${rsEsc(pwdLabel)})</span></div>${tdNote}${tdHtml}</div>
+${priNote}<div class="rs-section"><div class="rs-section-head">TAKEDOWN <span style="font-size:9pt;font-weight:500;">(from ${rsEsc(pwdLabel)})</span></div>${tdNote}${tdHtml}</div>
 <div class="rs-section"><div class="rs-section-head">CUSTOMERS COMING TODAY</div>${custHtml}</div>
 ${procSection('blast','Blast')}
 ${procSection('prep','Prep')}
 ${procSection('coat','Coat')}
-<div class="rs-footer">
-  <div class="rs-footer-title">— END OF DAY —</div>
-  <div class="rs-writein">Oven cycles run: <span class="rs-writein-line">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></div>
-  <div class="rs-writein">Jobs completed: <span class="rs-writein-line">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></div>
-  <div class="rs-writein">Anything stuck (and why): <span class="rs-writein-line" style="min-width:280px;">&nbsp;</span></div>
-</div>
 </div>`;
 }
 
