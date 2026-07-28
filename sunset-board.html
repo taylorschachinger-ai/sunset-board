@@ -1568,6 +1568,21 @@ function rsBuildPreviews(di) {
   const pwd = getPreviousWorkingDay(sheetDate);
   const pwdStr = pwd.toLocaleDateString('en-US', {weekday:'long', month:'long', day:'numeric'});
   const pwdDateStr = `${pwd.getFullYear()}-${String(pwd.getMonth()+1).padStart(2,'0')}-${String(pwd.getDate()).padStart(2,'0')}`;
+  // === DIAGNOSTIC LOGGING — remove after diagnosis ===
+  console.log('[TAKEDOWN] Previous working day (local):', pwdDateStr, '(' + pwdStr + ')');
+  Object.entries(jobs).forEach(([id, j]) => {
+    if (j.status !== 'cooked' && j.status !== 'ready-pickup') return;
+    const rawField = j.statusUpdatedAt;
+    let localDate = null;
+    if (rawField != null) {
+      const t = new Date(rawField);
+      localDate = `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
+    }
+    const matched = localDate === pwdDateStr;
+    const reason = rawField == null ? 'NO statusUpdatedAt field' : (!matched ? `localDate ${localDate} !== pwdDateStr ${pwdDateStr}` : 'MATCH');
+    console.log(`[TAKEDOWN] job="${j.customer}" status="${j.status}" statusUpdatedAt(raw)=${JSON.stringify(rawField)} typeof=${typeof rawField} localDate=${localDate} → ${reason}`);
+  });
+  // === END DIAGNOSTIC LOGGING ===
   const tdJobs = Object.entries(jobs).filter(([,j]) => {
     if (j.status !== 'cooked' && j.status !== 'ready-pickup') return false;
     if (!j.statusUpdatedAt) return false;
