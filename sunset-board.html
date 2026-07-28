@@ -1609,20 +1609,34 @@ async function openRsModal(di) {
   // Build auto previews
   rsBuildPreviews(di);
 
-  // Load existing plan
-  const snap = await db.ref('dailyPlans/' + rsCurrentKey).once('value');
-  const plan = snap.val();
-
-  document.getElementById('rs-cycle-target').value = plan ? (plan.cycleTarget || '') : '';
-  document.getElementById('rs-must-ship').value = plan ? (plan.mustShip || '') : '';
+  // Clear fields and open modal immediately so it's never blocked by a network error
+  document.getElementById('rs-cycle-target').value = '';
+  document.getElementById('rs-must-ship').value = '';
   ['customers','takedown','blast','prep','coat'].forEach(k => {
     const el = document.getElementById('rs-note-' + k);
-    el.value = plan ? (plan['notes_' + k] || '') : '';
+    el.value = '';
     rsCount(el, 'rs-cnt-' + k);
   });
-
-  document.getElementById('rs-btn-remove').style.display = plan ? '' : 'none';
+  document.getElementById('rs-btn-remove').style.display = 'none';
   document.getElementById('rs-overlay').classList.add('open');
+
+  // Load existing plan and fill fields
+  try {
+    const snap = await db.ref('dailyPlans/' + rsCurrentKey).once('value');
+    const plan = snap.val();
+    if (plan) {
+      document.getElementById('rs-cycle-target').value = plan.cycleTarget || '';
+      document.getElementById('rs-must-ship').value = plan.mustShip || '';
+      ['customers','takedown','blast','prep','coat'].forEach(k => {
+        const el = document.getElementById('rs-note-' + k);
+        el.value = plan['notes_' + k] || '';
+        rsCount(el, 'rs-cnt-' + k);
+      });
+      document.getElementById('rs-btn-remove').style.display = '';
+    }
+  } catch(e) {
+    console.error('Failed to load run sheet:', e);
+  }
 }
 
 async function saveRunSheet() {
