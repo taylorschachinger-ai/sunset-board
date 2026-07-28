@@ -243,6 +243,10 @@
   .rs-btn-save:hover { background: var(--teal-dark); }
   .rs-btn-cancel { padding: 12px 16px; border: 1px solid var(--border); background: none; color: var(--text2); border-radius: var(--radius-sm); font-size: 15px; cursor: pointer; min-height: 48px; }
   .rs-btn-remove { padding: 12px 16px; border: 1px solid #E24B4A; background: none; color: #A32D2D; border-radius: var(--radius-sm); font-size: 15px; cursor: pointer; margin-right: auto; min-height: 48px; }
+  .rs-diag-group { border: 1.5px dashed #b45309; border-radius: var(--radius-sm); margin-top: 16px; }
+  .rs-diag-group > summary { padding: 8px 10px; cursor: pointer; list-style: none; font-size: 12px; }
+  .rs-diag-group > summary::-webkit-details-marker { display: none; }
+  #rs-diag-body { padding: 10px; background: #fffbeb; border-top: 1px dashed #b45309; overflow-x: auto; }
 </style>
 </head>
 <body>
@@ -549,6 +553,13 @@
         </div>
       </div>
     </details>
+
+    <!-- ⚠️ TEMPORARY DIAGNOSTIC — REMOVE BEFORE PRODUCTION -->
+    <details class="rs-group rs-diag-group" id="rs-diag-details">
+      <summary style="color:#b45309;font-weight:700;">⚠️ TEMPORARY: Takedown Filter Diagnostic</summary>
+      <div class="rs-group-body" id="rs-diag-body" style="font-family:monospace;font-size:12px;white-space:pre-wrap;color:#1a1a18;"></div>
+    </details>
+    <!-- END TEMPORARY DIAGNOSTIC -->
 
     <div class="rs-modal-actions">
       <button class="rs-btn-remove" id="rs-btn-remove" style="display:none;" onclick="removeRunSheet()">Remove from Print</button>
@@ -1620,7 +1631,57 @@ function rsBuildPreviews(di) {
       const nonStd = rsIsNonStandardCure(j) ? ' ⚠ CUSTOM CURE' : '';
       return `Coat ${n}: ${j.customer||'—'} — ${j.color||'—'}${sup?' ['+sup+']':''}${nonStd}`;
     }).join('\n') : '(none)';
+
+  // ⚠️ TEMPORARY — populate diagnostic panel
+  rsBuildDiagnostic(pwdDateStr, pwdStr);
 }
+
+// ⚠️ TEMPORARY DIAGNOSTIC — REMOVE BEFORE PRODUCTION
+function rsBuildDiagnostic(pwdDateStr, pwdStr) {
+  const el = document.getElementById('rs-diag-body');
+  if (!el) return;
+
+  const cooked = Object.entries(jobs).filter(([,j]) =>
+    j.status === 'cooked' || j.status === 'ready-pickup'
+  );
+
+  let out = `Previous working day: ${pwdDateStr}  (${pwdStr})\n`;
+  out += `Jobs with status Cooked or Ready For Pickup: ${cooked.length}\n`;
+  out += '─'.repeat(72) + '\n';
+
+  if (!cooked.length) {
+    out += '(none found)\n';
+  } else {
+    const COL = [22, 16, 26, 12, 6];
+    const hdr = ['Job name', 'Status (stored)', 'statusUpdatedAt (stored)', 'Local date', 'Result'];
+    out += hdr.map((h,i) => h.padEnd(COL[i])).join('  ') + '\n';
+    out += COL.map(w => '─'.repeat(w)).join('  ') + '\n';
+    cooked.forEach(([, j]) => {
+      const name = (j.customer || '—').slice(0, COL[0]-1).padEnd(COL[0]);
+      const status = (j.status || '').padEnd(COL[1]);
+      const raw = j.statusUpdatedAt;
+      const rawStr = (raw == null ? 'MISSING' : String(raw)).slice(0, COL[2]-1).padEnd(COL[2]);
+      let localDate = 'n/a';
+      let result = '';
+      if (raw == null) {
+        result = 'NO MATCH — field missing';
+      } else {
+        const t = new Date(raw);
+        if (isNaN(t)) {
+          localDate = 'INVALID';
+          result = 'NO MATCH — invalid date';
+        } else {
+          localDate = `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
+          result = localDate === pwdDateStr ? 'MATCH ✓' : `NO MATCH — ${localDate} ≠ ${pwdDateStr}`;
+        }
+      }
+      out += `${name}  ${status}  ${rawStr}  ${localDate.padEnd(COL[3])}  ${result}\n`;
+    });
+  }
+
+  el.textContent = out;
+}
+// ⚠️ END TEMPORARY DIAGNOSTIC
 
 async function openRsModal(di) {
   if (userRole !== 'admin') return;
