@@ -1068,9 +1068,10 @@ function openModal(day, proc, slot, id) {
     loadPhotoPreview([]);
   }
 
-  // Role gating: staff editing an EXISTING job → read-only except status
+  // Role gating: staff editing an EXISTING job → read-only except status and photo-add
   const isExistingJob = !!(id && jobs[id]);
   const staffReadOnly = userRole === 'staff' && isExistingJob;
+  photoAddOnly = staffReadOnly;
   const editableIds = ['f-customer','f-phone','f-desc','f-color','f-cure-temp','f-cure-time',
     'f-cure-temp-2','f-cure-time-2','f-cure-temp-3','f-cure-time-3','f-invoice','f-rack',
     'f-masking','f-masking-desc','f-powder-eta','f-expected-arrival','f-pickup',
@@ -1079,6 +1080,8 @@ function openModal(day, proc, slot, id) {
     const el = document.getElementById(fid);
     if (el) el.disabled = staffReadOnly;
   });
+  // Photo input stays enabled for staff so they can add photos
+  document.getElementById('f-photo-input').disabled = false;
   document.querySelectorAll('input[name=powder]').forEach(function(r) { r.disabled = staffReadOnly; });
   document.querySelectorAll('.process-opt').forEach(function(el) {
     el.style.pointerEvents = staffReadOnly ? 'none' : '';
@@ -1427,6 +1430,7 @@ async function printDayTickets(di) {
 function deleteJob() { if(editingId&&confirm('Delete this job?')){ db.ref('jobs/'+editingId).remove(); closeModal(); } }
 
 let currentPhotos = [];
+let photoAddOnly = false;
 
 function fmtPickup(val) {
   if (!val) return '';
@@ -1455,11 +1459,14 @@ function renderPhotoPreview() {
     img.className = 'photo-thumb';
     img.src = src;
     img.onclick = () => openLightbox(src);
-    const rm = document.createElement('button');
-    rm.className = 'photo-remove';
-    rm.textContent = '✕';
-    rm.onclick = (e) => { e.stopPropagation(); currentPhotos.splice(i,1); renderPhotoPreview(); };
-    w.appendChild(img); w.appendChild(rm);
+    if (!photoAddOnly) {
+      const rm = document.createElement('button');
+      rm.className = 'photo-remove';
+      rm.textContent = '✕';
+      rm.onclick = (e) => { e.stopPropagation(); currentPhotos.splice(i,1); renderPhotoPreview(); };
+      w.appendChild(rm);
+    }
+    w.appendChild(img);
     wrap.appendChild(w);
   });
 }
@@ -1482,6 +1489,9 @@ function handlePhotoUpload(e) {
         const compressed = canvas.toDataURL('image/jpeg', 0.7);
         currentPhotos.push(compressed);
         renderPhotoPreview();
+        if (photoAddOnly && editingId) {
+          db.ref('jobs/' + editingId + '/photos').set(currentPhotos.slice());
+        }
       };
       img.src = ev.target.result;
     };
