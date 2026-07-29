@@ -579,6 +579,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script>
 // ===== POWDER CURE LIBRARY =====
 // Each color maps to its cure schedule: three temp/time pairs (degrees F / minutes), at peak metal temp.
@@ -1342,7 +1343,19 @@ ${photosHtml}
 <div class="qr-section">
   <div class="section-title">Scan to update status</div>
   <div class="qr-section">
-    <img src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent('https://taylorschachinger-ai.github.io/sunset-board/status.html?job=' + jobId)}" alt="Scan to update status">
+    ${(function() {
+      const statusUrl = 'https://taylorschachinger-ai.github.io/sunset-board/status.html?job=' + jobId;
+      let qrSrc;
+      try {
+        const qr = qrcode(0, 'M');
+        qr.addData(statusUrl);
+        qr.make();
+        qrSrc = qr.createDataURL(6, 0);
+      } catch(e) {
+        qrSrc = 'https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=' + encodeURIComponent(statusUrl);
+      }
+      return '<img src="' + qrSrc + '" alt="Scan to update status">';
+    })()}
     <div class="qr-text">
       <strong>Update job status</strong>
       Scan with any phone camera to open the status update page for this job.
@@ -1378,18 +1391,8 @@ function printHtmlDoc(bodyContent, extraStyles) {
   // Fallback: afterprint does not fire reliably on iOS
   setTimeout(cleanup, 60000);
 
-  // Wait for all images (e.g. QR codes) to load before printing,
-  // but cap the wait at 3 s so a slow/failed image never hangs the dialog.
-  const imgs = Array.from(printRoot.querySelectorAll('img'));
-  const allLoaded = Promise.all(imgs.map(function(img) {
-    if (img.complete && img.naturalWidth > 0) return Promise.resolve();
-    return new Promise(function(resolve) {
-      img.addEventListener('load', resolve, {once: true});
-      img.addEventListener('error', resolve, {once: true});
-    });
-  }));
-  const safetyTimeout = new Promise(function(resolve) { setTimeout(resolve, 3000); });
-  Promise.race([allLoaded, safetyTimeout]).then(function() { window.print(); });
+  // QR is now a local data-URI and logo is base64 — no remote images to wait for.
+  window.print();
 }
 
 function printJobTicket() {
