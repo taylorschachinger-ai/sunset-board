@@ -1378,7 +1378,18 @@ function printHtmlDoc(bodyContent, extraStyles) {
   // Fallback: afterprint does not fire reliably on iOS
   setTimeout(cleanup, 60000);
 
-  window.print();
+  // Wait for all images (e.g. QR codes) to load before printing,
+  // but cap the wait at 3 s so a slow/failed image never hangs the dialog.
+  const imgs = Array.from(printRoot.querySelectorAll('img'));
+  const allLoaded = Promise.all(imgs.map(function(img) {
+    if (img.complete && img.naturalWidth > 0) return Promise.resolve();
+    return new Promise(function(resolve) {
+      img.addEventListener('load', resolve, {once: true});
+      img.addEventListener('error', resolve, {once: true});
+    });
+  }));
+  const safetyTimeout = new Promise(function(resolve) { setTimeout(resolve, 3000); });
+  Promise.race([allLoaded, safetyTimeout]).then(function() { window.print(); });
 }
 
 function printJobTicket() {
