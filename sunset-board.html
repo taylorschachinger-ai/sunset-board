@@ -247,9 +247,15 @@
   .rs-diag-group > summary { padding: 8px 10px; cursor: pointer; list-style: none; font-size: 12px; }
   .rs-diag-group > summary::-webkit-details-marker { display: none; }
   #rs-diag-body { padding: 10px; background: #fffbeb; border-top: 1px dashed #b45309; overflow-x: auto; }
+  @media screen { #print-root { display: none; } }
+  @media print {
+    body > *:not(#print-root) { display: none !important; }
+    #print-root { display: block !important; }
+  }
 </style>
 </head>
 <body>
+<div id="print-root"></div>
 
 <div id="signin-screen" style="display:none; padding: 16px;">
   <div class="setup">
@@ -1346,25 +1352,29 @@ ${photosHtml}
 </div>`;
 }
 
-function printHtmlDoc(htmlString) {
-  const iframe = document.createElement('iframe');
-  iframe.style.cssText = 'position:fixed;left:-9999px;top:-9999px;width:0;height:0;border:0;';
-  document.body.appendChild(iframe);
-  const doc = iframe.contentWindow.document;
-  doc.open();
-  doc.write(htmlString);
-  doc.close();
-  iframe.onload = function() {
-    iframe.contentWindow.focus();
-    iframe.contentWindow.print();
-    iframe.contentWindow.addEventListener('afterprint', function() {
-      document.body.removeChild(iframe);
-    });
-    // Fallback removal in case afterprint doesn't fire (e.g. iOS)
-    setTimeout(function() {
-      if (iframe.parentNode) document.body.removeChild(iframe);
-    }, 60000);
-  };
+function printHtmlDoc(bodyContent, extraStyles) {
+  const printRoot = document.getElementById('print-root');
+  printRoot.innerHTML = bodyContent;
+
+  const style = document.createElement('style');
+  style.id = 'print-inject';
+  style.textContent = buildTicketStyles() + (extraStyles || '');
+  document.head.appendChild(style);
+
+  function cleanup() {
+    printRoot.innerHTML = '';
+    const s = document.getElementById('print-inject');
+    if (s) s.parentNode.removeChild(s);
+  }
+
+  window.addEventListener('afterprint', function onAP() {
+    window.removeEventListener('afterprint', onAP);
+    cleanup();
+  });
+  // Fallback: afterprint does not fire reliably on iOS
+  setTimeout(cleanup, 60000);
+
+  window.print();
 }
 
 function printJobTicket() {
@@ -1378,8 +1388,7 @@ function printJobTicket() {
     const idx = sameProc.findIndex(([id]) => id === editingId);
     if (idx >= 0) posNum = idx + 1;
   }
-  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Job Ticket — ${j.customer || ''}</title><style>${buildTicketStyles()}</style></head><body>${buildTicketBodyHtml(editingId, j, posNum)}</body></html>`;
-  printHtmlDoc(html);
+  printHtmlDoc(buildTicketBodyHtml(editingId, j, posNum));
 }
 
 async function printDayTickets(di) {
@@ -1398,7 +1407,6 @@ async function printDayTickets(di) {
     const content = buildTicketBodyHtml(id, j, posNum);
     return i < dayJobs.length - 1 ? `<div class="page-break">${content}</div>` : content;
   }).join('');
-  const dayName = DAYS[di] || 'Day';
 
   // Prepend run sheet if a saved plan exists for this day (any authenticated user can read)
   let runSheetHtml = '';
@@ -1413,8 +1421,7 @@ async function printDayTickets(di) {
     console.error('[printDayTickets] Failed to load run sheet from dailyPlans:', e);
   }
 
-  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Job Tickets — ${dayName}</title><style>${buildTicketStyles()}${buildRsStyles()}</style></head><body>${runSheetHtml}${bodies}</body></html>`;
-  printHtmlDoc(html);
+  printHtmlDoc(runSheetHtml + bodies, buildRsStyles());
 }
 
 function deleteJob() { if(editingId&&confirm('Delete this job?')){ db.ref('jobs/'+editingId).remove(); closeModal(); } }
