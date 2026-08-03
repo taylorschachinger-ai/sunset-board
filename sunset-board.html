@@ -249,8 +249,9 @@
   #rs-diag-body { padding: 10px; background: #fffbeb; border-top: 1px dashed #b45309; overflow-x: auto; }
   @media screen { #print-root { display: none; } }
   @media print {
+    html, body { background: #fff !important; }
     body > *:not(#print-root) { display: none !important; }
-    #print-root { display: block !important; }
+    #print-root { display: block !important; background: #fff !important; }
   }
 </style>
 </head>
@@ -579,7 +580,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
+<script src="qrcode.js"></script>
 <script>
 // ===== POWDER CURE LIBRARY =====
 // Each color maps to its cure schedule: three temp/time pairs (degrees F / minutes), at peak metal temp.
