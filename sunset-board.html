@@ -1251,6 +1251,7 @@ function buildTicketStyles() {
   .oven-box .oven-pair { font-size: 15px; font-weight: 700; color: #1a1a18; padding: 6px 14px; border: 1.5px solid #1a1a18; border-radius: 4px; white-space: nowrap; }
   .qr-section { margin-top: 20px; display: flex; align-items: center; gap: 20px; }
   .qr-section img { width: 120px; height: 120px; flex-shrink: 0; }
+  .qr-section svg { width: 120px; height: 120px; flex-shrink: 0; }
   .qr-section .qr-text { font-size: 13px; color: #5f5e5a; line-height: 1.5; }
   .qr-section .qr-text strong { display: block; font-size: 14px; color: #1a1a18; margin-bottom: 4px; }
   .photos { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -1346,16 +1347,14 @@ ${photosHtml}
   <div class="qr-section">
     ${(function() {
       const statusUrl = 'https://taylorschachinger-ai.github.io/sunset-board/status.html?job=' + jobId;
-      let qrSrc;
       try {
         const qr = qrcode(0, 'M');
         qr.addData(statusUrl);
         qr.make();
-        qrSrc = qr.createDataURL(6, 0);
+        return qr.createSvgTag({cellSize: 4, margin: 0, scalable: true});
       } catch(e) {
-        qrSrc = 'https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=' + encodeURIComponent(statusUrl);
+        return '<img src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=' + encodeURIComponent(statusUrl) + '" alt="Scan to update status">';
       }
-      return '<img src="' + qrSrc + '" alt="Scan to update status">';
     })()}
     <div class="qr-text">
       <strong>Update job status</strong>
