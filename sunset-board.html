@@ -189,6 +189,8 @@
   .photo-thumb { width: 64px; height: 64px; object-fit: cover; border-radius: var(--radius-sm); border: 1px solid var(--border); cursor: pointer; }
   .photo-remove { position: absolute; top: -4px; right: -4px; width: 18px; height: 18px; background: #E24B4A; color: #fff; border: none; border-radius: 50%; font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1; }
   .card-rack { display: inline-block; font-size: 9px; padding: 2px 6px; border-radius: 20px; background: #EEE8FF; color: #4A2D9C; font-weight: 700; margin-top: 3px; }
+  .card-followup { display: inline-block; font-size: 9px; padding: 2px 6px; border-radius: 20px; background: #DC2626; color: #fff; font-weight: 700; margin-bottom: 3px; }
+  .card.followup { border-left: 3px solid #DC2626; }
   .card-has-photo { font-size: 10px; color: var(--text3); margin-top: 2px; }
   /* Photo lightbox */
   .lightbox { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 200; align-items: center; justify-content: center; }
@@ -369,6 +371,7 @@
 <div class="modal-overlay" id="modal-overlay" onclick="overlayClick(event)">
   <div class="modal">
     <h2 id="modal-title">Add job</h2>
+    <div class="field" style="margin-bottom:12px;"><label class="check-row"><input type="checkbox" id="f-follow-up"> 📞 Follow up — need to get back to customer</label></div>
     <div class="field"><label>Customer name *</label><input type="text" id="f-customer" placeholder="e.g. Apex Welding"></div>
     <div class="field"><label>Phone number <span style="font-weight:400;color:var(--text3);">(optional)</span></label><input type="tel" id="f-phone" placeholder="e.g. 770-555-1234"></div>
     <div class="field"><label>Item description</label><textarea id="f-desc" placeholder="e.g. 4 trailer frames, remove old powder"></textarea></div>
@@ -873,6 +876,12 @@ function makeCard(id, job, isParking) {
   const proc = job.unscheduled ? 'unscheduled' : job.process;
   card.className = 'job-card ' + proc;
 
+  if (job.followUp) {
+    card.classList.add('followup');
+    const fu = document.createElement('span'); fu.className = 'card-followup'; fu.textContent = '📞 Follow up';
+    card.appendChild(fu);
+  }
+
   const cname = document.createElement('div');
   cname.className = 'card-customer ' + proc;
   cname.textContent = job.customer || '—';
@@ -1041,6 +1050,7 @@ function openModal(day, proc, slot, id) {
     updateSlotOptions(j.day||0, j.process||'coat', j.slot||0);
     document.getElementById('f-expected-arrival').value = j.expectedArrival||'';
     document.getElementById('f-pickup').value = j.pickup||'';
+    document.getElementById('f-follow-up').checked = !!j.followUp;
     loadPhotoPreview(j.photos||[]);
   } else {
     document.getElementById('f-customer').value = '';
@@ -1068,6 +1078,7 @@ function openModal(day, proc, slot, id) {
     updateSlotOptions(day!==null?day:0, proc||'coat', slot!==null?slot:0);
     document.getElementById('f-expected-arrival').value = '';
     document.getElementById('f-pickup').value = '';
+    document.getElementById('f-follow-up').checked = false;
     loadPhotoPreview([]);
   }
 
@@ -1078,7 +1089,7 @@ function openModal(day, proc, slot, id) {
   const editableIds = ['f-customer','f-phone','f-desc','f-color','f-cure-temp','f-cure-time',
     'f-cure-temp-2','f-cure-time-2','f-cure-temp-3','f-cure-time-3','f-invoice','f-rack',
     'f-masking','f-masking-desc','f-powder-eta','f-expected-arrival','f-pickup',
-    'f-schedule-toggle','f-day','f-slot'];
+    'f-schedule-toggle','f-day','f-slot','f-follow-up'];
   editableIds.forEach(function(fid) {
     const el = document.getElementById(fid);
     if (el) el.disabled = staffReadOnly;
@@ -1155,6 +1166,7 @@ function saveJob() {
     expectedArrival: document.getElementById('f-expected-arrival').value || '',
     pickup: document.getElementById('f-pickup').value || '',
     photos: currentPhotos.slice(),
+    followUp: document.getElementById('f-follow-up').checked,
     statusUpdatedAt: Date.now()
   };
   if (editingId) db.ref('jobs/'+editingId).update(job);
