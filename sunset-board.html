@@ -1213,7 +1213,7 @@ function saveJob() {
     slot: scheduled ? slot : 0,
     week: scheduled ? weekKey() : '',
     unscheduled: !scheduled,
-    parkingOrder: !scheduled ? nextParkingOrder() : undefined,
+    parkingOrder: !scheduled ? nextParkingOrder() : null,
     powderStatus: (document.querySelector('input[name=powder]:checked') || {}).value || '',
     powderEta: document.getElementById('f-powder-ordered').checked ? document.getElementById('f-powder-eta').value : '',
     expectedArrival: document.getElementById('f-expected-arrival').value || '',
