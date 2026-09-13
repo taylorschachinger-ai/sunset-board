@@ -151,7 +151,9 @@
   .parking-drop-zone.drag-over { border-color: var(--teal); background: #f0faf6; }
   .parking-drop-zone.empty { align-items: center; justify-content: center; }
   .parking-empty-msg { font-size: 12px; color: var(--text3); text-align: center; }
-  .parking-card { width: 160px; flex-shrink: 0; }
+  .parking-card { width: 160px; flex-shrink: 0; position: relative; }
+  .parking-pos { position: absolute; top: 4px; right: 4px; width: 18px; height: 18px; border-radius: 50%; background: var(--teal); color: #fff; font-size: 9px; font-weight: 700; display: flex; align-items: center; justify-content: center; pointer-events: none; z-index: 1; }
+  .parking-card.drag-placeholder { opacity: 0.3; border: 2px dashed var(--teal); border-radius: var(--radius-sm); }
 
   /* MODAL */
   .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 100; align-items: center; justify-content: center; padding: 16px; }
@@ -825,8 +827,14 @@ function render() {
   });
 }
 
+function nextParkingOrder() {
+  const os = Object.values(jobs).filter(j => j.unscheduled && !j.readyPickup).map(j => j.parkingOrder).filter(n => typeof n === 'number');
+  return (os.length ? Math.max(...os) : -1) + 1;
+}
+
 function renderParking() {
-  const parked = Object.entries(jobs).filter(([id,j]) => j.unscheduled && !j.readyPickup);
+  const parked = Object.entries(jobs).filter(([id,j]) => j.unscheduled && !j.readyPickup)
+    .sort(([,a],[,b]) => (a.parkingOrder ?? Infinity) - (b.parkingOrder ?? Infinity));
   const count = parked.length;
   document.getElementById('parking-count').textContent = count + (count===1?' job':' jobs');
   const zone = document.getElementById('parking-zone');
@@ -835,17 +843,61 @@ function renderParking() {
   if (count === 0) {
     zone.innerHTML = '<span class="parking-empty-msg">No unscheduled jobs — drag a board card here to unschedule it</span>';
   } else {
-    parked.forEach(([id, job]) => {
+    parked.forEach(([id, job], i) => {
       const wrap = document.createElement('div'); wrap.className = 'parking-card';
+      wrap.dataset.id = id;
+      const pos = document.createElement('span'); pos.className = 'parking-pos'; pos.textContent = i + 1;
+      wrap.appendChild(pos);
       wrap.appendChild(makeCard(id, job, true)); zone.appendChild(wrap);
     });
   }
-  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
-  zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+
+  // Dragover: live reorder when dragging a parked card within the zone
+  zone.addEventListener('dragover', e => {
+    e.preventDefault();
+    const dragging = dragId && jobs[dragId];
+    if (!dragging || !jobs[dragId].unscheduled) {
+      zone.classList.add('drag-over');
+      return;
+    }
+    // Live reorder: find target parking-card under cursor
+    const targetWrap = e.target.closest('.parking-card');
+    if (!targetWrap || targetWrap.dataset.id === dragId) return;
+    const draggingWrap = zone.querySelector('.parking-card[data-id="' + dragId + '"]');
+    if (!draggingWrap) return;
+    const rect = targetWrap.getBoundingClientRect();
+    const mid = rect.left + rect.width / 2;
+    if (e.clientX < mid) {
+      zone.insertBefore(draggingWrap, targetWrap);
+    } else {
+      targetWrap.after(draggingWrap);
+    }
+  });
+
+  zone.addEventListener('dragleave', (e) => {
+    if (!e.relatedTarget || !zone.contains(e.relatedTarget)) zone.classList.remove('drag-over');
+  });
+
   zone.addEventListener('drop', e => {
     e.preventDefault(); zone.classList.remove('drag-over');
-    if (dragId && jobs[dragId]) db.ref('jobs/'+dragId).update({unscheduled:true, readyPickup:false});
+    if (!dragId || !jobs[dragId]) return;
+    if (jobs[dragId].unscheduled) {
+      // Persist the DOM order as sequential parkingOrder
+      persistParkingOrder(zone);
+    } else {
+      // Incoming board job — append to end
+      db.ref('jobs/'+dragId).update({unscheduled:true, readyPickup:false, parkingOrder: nextParkingOrder()});
+    }
   });
+
+  zone.addEventListener('dragend', () => zone.classList.remove('drag-over'));
+}
+
+function persistParkingOrder(zone) {
+  const wrappers = zone.querySelectorAll('.parking-card[data-id]');
+  const updates = {};
+  wrappers.forEach((w, i) => { updates[w.dataset.id + '/parkingOrder'] = i; });
+  if (Object.keys(updates).length) db.ref('jobs').update(updates);
 }
 
 function renderPickup() {
@@ -1161,6 +1213,7 @@ function saveJob() {
     slot: scheduled ? slot : 0,
     week: scheduled ? weekKey() : '',
     unscheduled: !scheduled,
+    parkingOrder: !scheduled ? nextParkingOrder() : undefined,
     powderStatus: (document.querySelector('input[name=powder]:checked') || {}).value || '',
     powderEta: document.getElementById('f-powder-ordered').checked ? document.getElementById('f-powder-eta').value : '',
     expectedArrival: document.getElementById('f-expected-arrival').value || '',
@@ -1541,6 +1594,7 @@ function startTouchDrag(e, id, card) {
   card.classList.add('dragging');
 
   let lastTarget = null;
+  let lastParkingCard = null;
 
   function onMove(ev) {
     const t = ev.touches[0];
@@ -1559,6 +1613,14 @@ function startTouchDrag(e, id, card) {
       if (target) target.classList.add('drag-over');
       lastTarget = target;
     }
+
+    // Track parking-card target for reorder (only when already parked)
+    if (dragId && jobs[dragId] && jobs[dragId].unscheduled && target && target.id === 'parking-zone') {
+      const pc = el ? el.closest('.parking-card') : null;
+      lastParkingCard = (pc && pc.dataset.id !== dragId) ? pc : null;
+    } else {
+      lastParkingCard = null;
+    }
   }
 
   function onEnd(ev) {
@@ -1569,10 +1631,21 @@ function startTouchDrag(e, id, card) {
 
     if (lastTarget) lastTarget.classList.remove('drag-over');
 
-    if (lastTarget && dragId && jobs[dragId]) {
-      if (lastTarget.id === 'parking-zone') {
-        db.ref('jobs/'+dragId).update({unscheduled:true});
-      } else {
+    if (dragId && jobs[dragId]) {
+      if (lastTarget && lastTarget.id === 'parking-zone') {
+        if (jobs[dragId].unscheduled && lastParkingCard) {
+          // Reorder: insert dragged card before/after the target parking card
+          const zone = document.getElementById('parking-zone');
+          const draggingWrap = zone.querySelector('.parking-card[data-id="' + dragId + '"]');
+          if (draggingWrap) {
+            lastParkingCard.before(draggingWrap);
+            persistParkingOrder(zone);
+          }
+        } else if (!jobs[dragId].unscheduled) {
+          db.ref('jobs/'+dragId).update({unscheduled:true, readyPickup:false, parkingOrder: nextParkingOrder()});
+        }
+        // else already parked, no specific card target — no-op (stays in place)
+      } else if (lastTarget) {
         // Read day/process/slot from slot's data attributes
         const di = parseInt(lastTarget.dataset.day);
         const proc = lastTarget.dataset.proc;
