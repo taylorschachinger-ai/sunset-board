@@ -1324,6 +1324,7 @@ function buildTicketStyles() {
   .footer { margin-top: 24px; padding-top: 12px; border-top: 1px solid #e0e0dc; display: flex; justify-content: space-between; font-size: 11px; color: #aaa; }
   .divider { border: none; border-top: 1px solid #e0e0dc; margin: 14px 0; }
   .work-banner { display: flex; gap: 16px; margin-bottom: 20px; }
+  .color-change-banner { background:#FFD400; color:#000; border:3px solid #000; border-radius:6px; padding:10px 12px; text-align:center; font-weight:800; font-size:22px; letter-spacing:0.08em; margin:0 0 10px; }
   .work-badge { display: flex; flex-direction: row; align-items: center; gap: 12px; padding: 14px 22px; border-radius: 8px; border: 3px solid; }
   .work-badge-label { font-size: 28px; font-weight: 900; letter-spacing: 0.12em; }
   .work-pos-badge { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 50%; border: 2.5px solid currentColor; font-size: 20px; font-weight: 900; margin-left: 4px; flex-shrink: 0; }
@@ -1334,6 +1335,20 @@ function buildTicketStyles() {
     body { padding: 16px; }
   }
   .page-break { page-break-after: always; }`;
+}
+
+function coatColorChange(jobId, j) {
+  if (j.process !== 'coat' || j.unscheduled || !j.week) return false;
+  const coats = Object.entries(jobs)
+    .filter(([id,x]) => x.process === 'coat' && !x.unscheduled && x.week)
+    .map(([id,x]) => { const d = new Date(x.week + 'T12:00:00'); d.setDate(d.getDate() + (x.day||0)); return { id, x, t: d.getTime(), slot: (x.slot||0) }; })
+    .sort((a,b) => a.t - b.t || a.slot - b.slot);
+  const idx = coats.findIndex(c => c.id === jobId);
+  if (idx <= 0) return false;
+  const prev = coats[idx-1].x;
+  const cur = (j.color||'').trim(), prv = (prev.color||'').trim();
+  if (!cur || !prv) return false;
+  return cur.toLowerCase() !== prv.toLowerCase();
 }
 
 function buildTicketBodyHtml(jobId, j, posNum) {
@@ -1352,7 +1367,8 @@ function buildTicketBodyHtml(jobId, j, posNum) {
       j.photos.map(src => `<img src="${src}" class="photo">`).join('') +
       '</div>';
   }
-  return `${buildWorkBanner(j, posNum)}
+  const colorChanged = coatColorChange(jobId, j);
+  return `${colorChanged ? '<div class="color-change-banner">⚠ COLOR CHANGE</div>' : ''}${buildWorkBanner(j, posNum)}
 <div class="header">
   <div class="header-left">
     <h1>Job Ticket</h1>
