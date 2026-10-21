@@ -182,6 +182,9 @@
   .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; flex-wrap: wrap; }
   .btn-del { padding: 8px 14px; border: 1px solid #E24B4A; background: none; color: #A32D2D; border-radius: var(--radius-sm); font-size: 13px; cursor: pointer; margin-right: auto; }
   .btn-dup { padding: 8px 14px; border: 1px solid var(--teal); background: none; color: var(--teal); border-radius: var(--radius-sm); font-size: 13px; cursor: pointer; }
+  .dup-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  .dup-label { font-size: 11px; color: var(--text3); font-weight: 600; }
+  .btn-dup-opt { padding: 6px 10px; border: 1px solid var(--teal); background: #fff; color: var(--teal); border-radius: var(--radius-sm); font-size: 12px; cursor: pointer; }
   .btn-print { padding: 8px 14px; border: 1px solid #888; background: none; color: var(--text2); border-radius: var(--radius-sm); font-size: 13px; cursor: pointer; }
   .btn-cancel { padding: 8px 14px; border: 1px solid var(--border); background: none; color: var(--text2); border-radius: var(--radius-sm); font-size: 13px; cursor: pointer; }
   .btn-save { padding: 8px 18px; background: var(--teal); color: #fff; border: none; border-radius: var(--radius-sm); font-size: 13px; font-weight: 600; cursor: pointer; }
@@ -475,7 +478,14 @@
 
     <div class="modal-actions">
       <button class="btn-del" id="btn-del" onclick="deleteJob()" style="display:none;">Delete</button>
-      <button class="btn-dup" id="btn-dup" onclick="duplicateJob()" style="display:none;">Duplicate</button>
+      <div id="dup-row" class="dup-row" style="display:none;">
+        <span class="dup-label">Duplicate to:</span>
+        <button type="button" class="btn-dup-opt" onclick="duplicateTo('blast')">Blast</button>
+        <button type="button" class="btn-dup-opt" onclick="duplicateTo('prep')">Prep</button>
+        <button type="button" class="btn-dup-opt" onclick="duplicateTo('coat')">Coat</button>
+        <button type="button" class="btn-dup-opt" onclick="duplicateTo('pickup')">Pickup</button>
+        <button type="button" class="btn-dup-opt" onclick="duplicateTo('parking')">Parking</button>
+      </div>
       <button class="btn-print" id="btn-print" onclick="printJobTicket()" style="display:none;">🖨 Print</button>
       <button class="btn-cancel" onclick="closeModal()">Cancel</button>
       <button class="btn-save" id="btn-save" onclick="saveJob()">Save</button>
@@ -1063,7 +1073,7 @@ function openModal(day, proc, slot, id) {
   editingId = id || null;
   document.getElementById('modal-title').textContent = id ? 'Edit job' : 'Add job';
   document.getElementById('btn-del').style.display = id ? 'block' : 'none';
-  document.getElementById('btn-dup').style.display = id ? 'block' : 'none';
+  document.getElementById('dup-row').style.display = id ? 'block' : 'none';
   document.getElementById('btn-print').style.display = id ? 'block' : 'none';
 
   const isScheduled = id && jobs[id] ? !jobs[id].unscheduled : false;
@@ -1155,7 +1165,7 @@ function openModal(day, proc, slot, id) {
   });
   if (staffReadOnly) {
     document.getElementById('btn-del').style.display = 'none';
-    document.getElementById('btn-dup').style.display = 'none';
+    document.getElementById('dup-row').style.display = 'none';
   }
   document.getElementById('btn-save').style.display = staffReadOnly ? 'none' : '';
   document.getElementById('btn-save').textContent = isExistingJob ? 'Save' : 'Add job';
@@ -1227,19 +1237,35 @@ function saveJob() {
   closeModal();
 }
 
-function duplicateJob() {
+function nextFreeSlot(di, proc) {
+  const count = getSlotCount(di, proc);
+  for (let s = 0; s < count; s++) {
+    const taken = Object.values(jobs).some(j => j.week===weekKey() && j.day===di && j.process===proc && j.slot===s && !j.unscheduled);
+    if (!taken) return s;
+  }
+  db.ref('slotCounts/' + slotKey(di, proc)).set(count + 1);
+  return count;
+}
+
+function duplicateTo(dest) {
   if (!editingId || !jobs[editingId]) return;
-  const original = jobs[editingId];
-  const copy = Object.assign({}, original);
-  // Place in parking lot so user can drag it to the right slot
-  copy.unscheduled = true;
-  copy.week = '';
-  copy.slot = 0;
-  copy.day = 0;
+  const orig = jobs[editingId];
+  const copy = Object.assign({}, orig);
+  if (dest === 'parking') {
+    copy.unscheduled = true; copy.readyPickup = false; copy.week = ''; copy.day = 0; copy.slot = 0;
+    copy.parkingOrder = nextParkingOrder();
+  } else if (dest === 'pickup') {
+    copy.readyPickup = true; copy.unscheduled = true;
+    delete copy.parkingOrder;
+  } else {
+    const di = (!orig.unscheduled && orig.week) ? (orig.day || 0) : currentDayOffset;
+    const s = nextFreeSlot(di, dest);
+    copy.unscheduled = false; copy.readyPickup = false;
+    copy.week = weekKey(); copy.day = di; copy.process = dest; copy.slot = s;
+    delete copy.parkingOrder;
+  }
   db.ref('jobs').push(copy);
   closeModal();
-  // Open parking lot so they can see the copy
-  if (!parkingOpen) toggleParking();
 }
 
 function buildOvenCheck(j) {
